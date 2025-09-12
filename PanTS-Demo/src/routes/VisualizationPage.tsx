@@ -86,7 +86,6 @@ function VisualizationPage() {
       }
       if (!axial_ref.current || !sagittal_ref.current || !coronal_ref.current || !render_ref.current || cmap.length === 0) return;
 
-      console.log(cmap)
 
       const result =
         await renderVisualization(axial_ref.current, sagittal_ref.current, coronal_ref.current, cmap, pantsCase, setLoading);

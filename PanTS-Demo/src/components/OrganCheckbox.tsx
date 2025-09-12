@@ -58,7 +58,7 @@ function Checked({ system, labelColorMap, checkState, setCheckState }: ChipBoxPr
         </div>
             <div className={`flex flex-col gap-2 transition-all duration-100 origin-top ${!collapsed ? "hidden scale-y-0" : "scale-y-100"}`}>
             {OrganSystems[system].map((organ) => {
-              const color = labelColorMap[getOrganIdx(organ)];
+              const color = labelColorMap[getOrganIdx(organ)+1];
               const rgb = color ? `rgb(${color[0]}, ${color[1]}, ${color[2]})` : "gray";
               return (
                 <div className="flex items-center gap-2 pl-4" key={organ}>
