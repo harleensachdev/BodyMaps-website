@@ -183,7 +183,7 @@ def assign_colors_with_high_contrast(label_ids, adjacency_graph, min_initial_col
     print(f"✅ Final color count used: {len(set(assignments.values()))}")
 
     color_map = {
-        str(label): {
+        str(round(label)): {
             "R": final_colors[color_idx][0],
             "G": final_colors[color_idx][1],
             "B": final_colors[color_idx][2],

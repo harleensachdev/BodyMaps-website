@@ -97,15 +97,17 @@ def get_image_preview(clabel_id):
 def get_label_colormap(clabel_id):
     subfolder = "LabelTr" if int(clabel_id) < 9000 else "LabelTe"
     
-    clabel_path = os.path.join(Constants.PANTS_PATH, "data", subfolder, get_panTS_id(int(clabel_id)),  'combined_labels.npz')
+    clabel_path = os.path.join(Constants.PANTS_PATH, "data", subfolder, get_panTS_id(int(clabel_id)),  'combined_labels.nii.gz')
 
     if not os.path.exists(clabel_path):
         print(f"File not found: {clabel_path}. Making file")
         combine_label_npz(int(clabel_id))
-
+        npzProcessor = NpzProcessor()
+        npzProcessor.npz_to_nifti(int(clabel_id))
     try:
-        clabel_array = np.load(clabel_path)["data"]
-        print("[DEBUG] NPZ loaded, shape =", clabel_array.shape)
+        clabel_array = nib.load(clabel_path)
+        clabel_array = clabel_array.get_fdata()
+        print("[DEBUG] Nifti loaded, shape =", clabel_array.shape)
 
         filled_array = fill_voids_with_nearest_label(clabel_array)
         print("[DEBUG] fill_voids_with_nearest_label done")
