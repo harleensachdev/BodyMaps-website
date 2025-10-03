@@ -2,6 +2,7 @@ import type { Color } from '@cornerstonejs/core/dist/types/types';
 import { IconArrowLeft, IconChevronRight } from '@tabler/icons-react';
 import React, { useEffect, useState } from 'react';
 import { OrganSystems, OrganSystemsArray, segmentation_categories } from '../helpers/constants';
+import { deepIsEqual } from '../helpers/utils';
 import { type AllSystems, type OrganSystemsAllType, type SubSystems, type Systems } from '../types';
 
 type ChipBoxProps = {
@@ -34,26 +35,43 @@ const getOrganIdx = (organ: string) => {
 
 function Checked({ OrganSystem, system, labelColorMap, checkState, setCheckState, level=0 }: ChipBoxProps) {
     const [collapsed, setCollapsed] = useState(false);
-    const [toggled, setToggled] = useState(true);
+    const [partialToggled, setPartialToggled] = useState(true);
+    const updateToggle = (toggled: boolean) => {
+      if (!OrganSystem[system]) return;
+      const newCheckState = [...checkState];
+      OrganSystem[system].forEach((sub) => {
+        if (typeof sub === "string") {
+          newCheckState[getOrganIdx(sub)+1] = toggled; 
+          console.log(toggled);
+          return;
+        }
+        const key: SubSystems = Object.keys(sub)[0] as SubSystems;
+        const suborgans = sub[key];
+        if (!suborgans) return newCheckState;
+        suborgans.forEach((suborgan) => newCheckState[getOrganIdx(suborgan)+1] = toggled);
+        // return newCheckState;
+      })
+      if (!deepIsEqual(newCheckState, checkState)) {
+        setCheckState(newCheckState);
+      }
+    }
+
 
     useEffect(() => {
       if (!OrganSystem[system]) return;
+      let flag = false;
       OrganSystem[system].forEach((sub) => {
-        setCheckState(checkState => {
-          const newCheckState = [...checkState];
-          if (typeof sub === "string") {
-            newCheckState[getOrganIdx(sub)+1] = toggled; 
-            return newCheckState
+        if (typeof sub === "string") {
+          if (checkState[getOrganIdx(sub)+1] === true) {
+            flag = true;
+            if (partialToggled !== true) setPartialToggled(true);
+            return;
           }
-          const key: SubSystems = Object.keys(sub)[0] as SubSystems;
-          const suborgans = sub[key];
-          if (!suborgans) return newCheckState;
-          suborgans.forEach((suborgan) => newCheckState[getOrganIdx(suborgan)+1] = toggled);
-          return newCheckState;
-        });
-      })
-      
-    }, [toggled, setCheckState, OrganSystem, system])
+        }
+      });
+      if (flag === false) setPartialToggled(false);
+    }, [checkState, OrganSystem, system, partialToggled, setPartialToggled])
+
     if (!OrganSystem[system] || level > 1) return null;
     return (
       <div className={`flex gap-2 flex-col ${level === 0 ? "" : "pl-4"}`} >
@@ -63,8 +81,8 @@ function Checked({ OrganSystem, system, labelColorMap, checkState, setCheckState
             <div className={`text-white ${level === 0 ? "text-lg" : "text-md"}`}>{system}</div>
             </div>
             <input type="checkbox" className="w-4 h-4 text-blue-600 !bg-gray-700 border-gray-600 !rounded-sm focus:ring-blue-600 ring-offset-gray-800 focus:ring-2"
-              checked={toggled}
-              onChange={(e) => setToggled(e.target.checked)}
+              checked={partialToggled}
+              onChange={() => {updateToggle(!partialToggled)}}
             />
         </div>
             <div className={`flex flex-col gap-2 transition-all duration-100 origin-top ${!collapsed ? "hidden scale-y-0" : "scale-y-100"}`}>

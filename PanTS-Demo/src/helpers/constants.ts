@@ -4,6 +4,7 @@ import type {
 	cornerstoneCustomColorLUTType,
 	OrganSystemsType,
 	SegmentationCategories,
+	SubSystems,
 	Systems,
 } from "../types";
 
@@ -114,6 +115,12 @@ export const OrganSystemsArray: Systems[] = [
 	// "Lung",
 	// "Other"
 ];
+
+export const OrgansSubsystemsArray: SubSystems[] = [
+	"Kidneys",
+	"Pancreas"
+]
+
 export const OrganSystems: OrganSystemsType = {
 	"Vascular System": [
 		"aorta",
