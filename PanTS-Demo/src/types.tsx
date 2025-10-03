@@ -79,7 +79,7 @@ export type SegmentationAnnotations = {
 };
 
 export type Systems = "Vascular System" | "Lymphatic System" | "Reproductive System" | "Urinary System" | "Digestive System" | "Skeletal System" | "Respiratory System" | "Endocrine System";
-export type SubSystems = "Adrenal Glands" | "Pancreas" | "Kidneys" | "Lung"
+export type SubSystems = "Pancreas" | "Kidneys"
 
 export type AllSystems = Systems | SubSystems;
 
@@ -126,6 +126,10 @@ export type LabelRequest = {
 export type cornerstoneCustomColorLUTType = {
 	[key: number]: number[];
 };
+
+export type MiscColorMapType = {
+	[key in SubSystems]: [number, number, number];
+}
 
 export type APP_CONSTANTS_TYPE = {
 	DEFAULT_SEGMENTATION_OPACITY: number;

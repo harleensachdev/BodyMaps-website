@@ -1,11 +1,11 @@
 import type { Color } from "@cornerstonejs/core/dist/types/types";
 import type {
 	APP_CONSTANTS_TYPE,
-	cornerstoneCustomColorLUTType,
+	cornerstoneCustomColorLUTType, MiscColorMapType,
 	OrganSystemsType,
 	SegmentationCategories,
 	SubSystems,
-	Systems,
+	Systems
 } from "../types";
 
 export const API_BASE = import.meta.env.VITE_API_BASE;
@@ -121,12 +121,17 @@ export const OrgansSubsystemsArray: SubSystems[] = [
 	"Pancreas"
 ]
 
+export const MiscColorMap: MiscColorMapType = {
+	"Kidneys": [144, 238, 200],
+	"Pancreas": [244, 160, 160]
+}
+
 export const OrganSystems: OrganSystemsType = {
 	"Vascular System": [
 		"aorta",
 		"celiac_artery",
-		"postcava",
 		"superior_mesenteric_artery",
+		"postcava",
 		"veins",
 	],
 	"Endocrine System": ["adrenal_gland_left", "adrenal_gland_right"],
@@ -146,11 +151,11 @@ export const OrganSystems: OrganSystemsType = {
 			],
 		},
 		"colon",
-		"common_bile_duct",
 		"duodenum",
-		"gall_bladder",
-		"liver",
 		"stomach",
+		"liver",
+		"common_bile_duct",
+		"gall_bladder",
 	],
 	"Respiratory System": ["lung_left", "lung_right"],
 	"Reproductive System": ["prostate"],
