@@ -67,6 +67,60 @@ class Constants:
         27: "veins"
     }
     
-        
-
-
+    MODEL_ALIASES = {
+        # GE
+        "lightspeed 16": "LightSpeed 16",
+        "lightspeed16": "LightSpeed 16",
+        "lightspeed vct": "LightSpeed VCT",
+        "lightspeed qx/i": "LightSpeed QX/i",
+        "lightspeed pro 16": "LightSpeed Pro 16",
+        "lightspeed pro 32": "LightSpeed Pro 32",
+        "lightspeed plus": "LightSpeed Plus",
+        "lightspeed ultra": "LightSpeed Ultra",
+        # Siemens
+        "somatom definition as+": "SOMATOM Definition AS+",
+        "somatom definition as": "SOMATOM Definition AS",
+        "somatom definition flash": "SOMATOM Definition Flash",
+        "somatom definition edge": "SOMATOM Definition Edge",
+        "somatom force": "SOMATOM Force",
+        "somatom go.top": "SOMATOM Go.Top",
+        "somatom plus 4": "SOMATOM PLUS 4",
+        "somatom scope": "SOMATOM Scope",
+        "somatom definition": "SOMATOM Definition",
+        "sensation 4": "Sensation 4",
+        "sensation 10": "Sensation 10",
+        "sensation 16": "Sensation 16",
+        "sensation 40": "Sensation 40",
+        "sensation 64": "Sensation 64",
+        "sensation cardiac 64": "Sensation Cardiac 64",
+        "sensation open": "Sensation Open",
+        "emotion 16": "Emotion 16",
+        "emotion 6 (2007)": "Emotion 6 (2007)",
+        "perspective": "Perspective",
+        # Philips
+        "brilliance 10": "Brilliance 10",
+        "brilliance 16": "Brilliance 16",
+        "brilliance 16p": "Brilliance 16P",
+        "brilliance 40": "Brilliance 40",
+        "brilliance 64": "Brilliance 64",
+        "ingenuity core 128": "Ingenuity Core 128",
+        "iqon - spectral ct": "IQon - Spectral CT",
+        "philips ct aura": "Philips CT Aura",
+        "precedence 16p": "Precedence 16P",
+        # Canon / Toshiba
+        "aquilion one": "Aquilion ONE",
+        "aquilion": "Aquilion",
+        # GE 其他
+        "optima ct540": "Optima CT540",
+        "optima ct660": "Optima CT660",
+        "optima ct520 series": "Optima CT520 Series",
+        "revolution ct": "Revolution CT",
+        "revolution evo": "Revolution EVO",
+        "discovery st": "Discovery ST",
+        "discovery ste": "Discovery STE",
+        "discovery mi": "Discovery MI",
+        "hispeed ct/i": "HiSpeed CT/i",
+        # PET/CT
+        "biograph128": "Biograph128",
+        "biograph 128": "Biograph128",
+    }

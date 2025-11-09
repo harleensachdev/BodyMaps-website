@@ -47,6 +47,9 @@ PDF_DIR = f"{Constants.PANTS_PATH}/data/pdf"
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 os.makedirs(PDF_DIR, exist_ok=True)
 
+def _arg(name: str, default=None):
+    return request.args.get(name, default)
+
 @api_blueprint.route('/get_preview/<clabel_ids>', methods=['GET'])
 def get_preview(clabel_ids):
     # get age and thumbnail
@@ -451,11 +454,295 @@ def get_result(session_id):
 @api_blueprint.route('/ping', methods=['GET'])
 def ping():
     return jsonify({"message": "pong"}), 200
-# @api_blueprint.route('/scheduled_check', methods = ['GET'])
-# def scheduled_check():
-#     session_manager = SessionManager.instance()
-#     session_manager.scheduled_check()
-#     stmt = db.select(ApplicationSession)
-#     resp = db.session.execute(stmt)
-#     print(resp.scalars().all())
-#     return 'hi'
+
+@api_blueprint.route("/search", methods=["GET"])
+def api_search():
+    # return jsonify({"message": "pong"}), 200
+    df = apply_filters(DF).copy()
+    sort_by  = (_arg("sort_by", "top") or "top").strip().lower()
+    sort_by  = (_arg("sort_by", "top") or "top").strip().lower()
+    df = ensure_sort_cols(df)
+
+    # ---- 排序參數 ----
+    sort_by  = (_arg("sort_by", "top") or "top").strip().lower()
+    sort_dir = (_arg("sort_dir", "asc") or "asc").strip().lower()
+
+    if sort_by in ("top", "quality"):
+        by  = ["__complete", "__spacing_sum", "__shape_sum", "__case_sortkey"]
+        asc = [False, True, False, True]
+    elif sort_by in ("id", "id_asc"):
+        by, asc = ["__case_sortkey"], [True]
+    elif sort_by == "id_desc":
+        by, asc = ["__case_sortkey"], [False]
+    elif sort_by in ("shape_desc", "shape"):
+        by, asc = ["__shape_sum", "__case_sortkey"], [False, True]
+    elif sort_by in ("spacing_asc", "spacing"):
+        by, asc = ["__spacing_sum", "__case_sortkey"], [True, True]
+    elif sort_by == "age_asc":
+        by, asc = ["__age", "__case_sortkey"], [True, True]
+    elif sort_by == "age_desc":
+        by, asc = ["__age", "__case_sortkey"], [False, True]
+    else:
+        key_map = {"id": "__case_sortkey", "spacing": "__spacing_sum", "shape": "__shape_sum"}
+        k = key_map.get(sort_by, "__case_sortkey")
+        by, asc = [k, "__case_sortkey"], [(sort_dir != "desc"), True]
+
+    # ---- 排序 ----
+    df = df.sort_values(by=by, ascending=asc, na_position="last", kind="mergesort")
+
+    # ---- 分頁：注意 total 先算完篩選後的完整筆數 ----
+    total    = int(len(df))
+    page     = max(to_int(_arg("page", "1")) or 1, 1)
+    per_page = to_int(_arg("per_page", "24")) or 24
+    per_page = max(1, min(per_page, 1_000_000))
+
+    pages = max(1, int(math.ceil(total / per_page)))
+    page  = max(1, min(page, pages))
+    start, end = (page - 1) * per_page, (page - 1) * per_page + per_page
+
+    # ---- 轉成前端想要的 items ----
+    items = [row_to_item(r) for _, r in df.iloc[start:end].iterrows()]
+    items = clean_json_list(items)
+
+    return jsonify({
+        "items": items,         # ← 前端只讀這個渲染卡片
+        "total": total,         # ← 正確的最終數量
+        "page": page,
+        "per_page": per_page,
+        "query": request.query_string.decode(errors="ignore") or ""
+    })
+
+
+def _facet_counts_with_unknown(df: pd.DataFrame, col_key: str, top_k: int = 6) -> Dict[str, Any]:
+    """Compute facet rows + unknown count, with robust handling for NaN/strings."""
+    rows: List[Dict[str, Any]] = []
+    unknown: int = 0
+
+    key_to_col = {
+        "ct_phase": ("__ct", str),
+        "manufacturer": ("__mfr", str),
+        "year": ("__year_int", int),
+        "sex": ("__sex", str),
+        "tumor": ("__tumor01", int),
+        "model": ("model", str),
+        "study_type": ("study_type", str),
+        "site_nat": ("site_nationality", str),
+        "site_nationality": ("site_nationality", str),
+    }
+    if col_key not in key_to_col:
+        return {"rows": [], "unknown": 0}
+
+    col_name, _typ = key_to_col[col_key]
+    if col_name not in df.columns:
+        return {"rows": [], "unknown": 0}
+
+    ser = df[col_name]
+
+    # ---- Year：數值化、NaN 視為 unknown ----
+    if col_key == "year":
+        s_num = pd.to_numeric(ser, errors="coerce")
+        unknown = int(s_num.isna().sum())
+        vc = s_num.dropna().astype(int).value_counts()
+        rows = [{"value": int(v), "count": int(c)} for v, c in vc.items()]
+        rows.sort(key=lambda x: (-x["count"], x["value"]))
+        if top_k and top_k > 0:
+            rows = rows[:top_k]
+        return {"rows": rows, "unknown": unknown}
+
+    # ---- 其他欄位：把空字串/unknown 類型歸入 unknown ----
+    s_str = ser.astype(str).str.strip()
+    s_lc = s_str.str.lower()
+    unknown_mask = ser.isna() | (s_str == "") | (s_lc.isin({"unknown", "nan", "none", "n/a", "na"}))
+    unknown = int(unknown_mask.sum())
+
+    vals = ser[~unknown_mask]
+    vc = vals.value_counts(dropna=False)
+
+    tmp_rows: List[Dict[str, Any]] = []
+    for v, c in vc.items():
+        if col_key == "tumor":
+            # tumor 僅接受 0/1
+            try:
+                iv = int(v)
+            except Exception:
+                continue
+            if iv not in (0, 1):
+                continue
+            tmp_rows.append({"value": iv, "count": int(c)})
+        else:
+            tmp_rows.append({"value": v, "count": int(c)})
+
+    # 排序：count desc，再 value 升（字串比較避免型別問題）
+    tmp_rows.sort(key=lambda x: (-x["count"], str(x["value"])))
+    if top_k and top_k > 0:
+        tmp_rows = tmp_rows[:top_k]
+
+    rows = tmp_rows
+    return {"rows": rows, "unknown": unknown}
+
+
+def _prune_zero_rows(rows: List[Dict[str, Any]], keep_zero: bool) -> List[Dict[str, Any]]:
+    """依需求濾掉 count<=0；當 keep_zero=True（對應 guarantee=1）則不濾。"""
+    if keep_zero:
+        return rows
+    out: List[Dict[str, Any]] = []
+    for r in rows or []:
+        try:
+            c = int(r.get("count") or 0)
+        except Exception:
+            c = 0
+        if c > 0:
+            out.append(r)
+    return out
+
+
+@api_blueprint.route("/facets", methods=["GET"])
+def api_facets():
+    try:
+        fields_raw = (_arg("fields","ct_phase,manufacturer") or "").strip()
+        fields = [f.strip().lower() for f in fields_raw.split(",") if f.strip()]
+
+        valid  = {
+            "ct_phase","manufacturer","year","sex","tumor",
+            "model","study_type","site_nat","site_nationality"
+        }
+        fields = [f for f in fields if f in valid] or ["ct_phase","manufacturer"]
+        top_k  = to_int(_arg("top_k","6")) or 6
+        guarantee = (_arg("guarantee","0") or "0").strip().lower() in ("1","true","yes","y")
+
+        # 先應用目前的過濾條件
+        df_now = apply_filters(DF)
+        base_for_ranges = df_now if len(df_now) else DF
+
+        facets: Dict[str, List[Dict[str, Any]]] = {}
+        unknown_counts: Dict[str, int] = {}
+
+        # 為每個 facet 準備自我排除的條件（避免自我影響）
+        exclude_map = {
+            "ct_phase": {"ct_phase"},
+            "manufacturer": {"manufacturer","mfr_is_null","manufacturer_is_null"},
+            "year": {"year_from","year_to"},
+            "sex": {"sex"},
+            "tumor": {"tumor"},
+            "model": {"model"},
+            "study_type": {"study_type"},
+            "site_nat": {"site_nat","site_nationality"},
+            "site_nationality": {"site_nat","site_nationality"},
+        }
+
+        for f in fields:
+            ex = exclude_map.get(f, set())
+            # 若 guarantee=1 且目前篩完為空，改用全量 DF 以「保證列出所有可能值」
+            src = (DF if (guarantee and len(df_now) == 0) else df_now)
+            df_facet = apply_filters(src, exclude=ex)
+            res = _facet_counts_with_unknown(df_facet, f, top_k=top_k)
+
+            # guarantee=0 時砍掉 count<=0 的項目
+            rows = _prune_zero_rows(res.get("rows") or [], keep_zero=guarantee)
+            facets[f] = rows
+            unknown_counts[f] = int(res.get("unknown") or 0)
+
+        # 年齡/年份範圍（原樣保留）
+        def _minmax(series: pd.Series):
+            s = series.dropna()
+            if not len(s): return (None, None)
+            return (float(s.min()), float(s.max()))
+
+        age_min = age_max = None
+        year_min = year_max = None
+        if "__age" in base_for_ranges:
+            age_min, age_max = _minmax(base_for_ranges["__age"])
+        if "__year_int" in base_for_ranges:
+            yr = base_for_ranges["__year_int"].dropna().astype(int)
+            if len(yr):
+                year_min, year_max = int(yr.min()), int(yr.max())
+
+        return jsonify({
+            "facets": facets,
+            "unknown_counts": unknown_counts,
+            "age_range": {"min": age_min, "max": age_max},
+            "year_range": {"min": year_min, "max": year_max},
+            "total": int(len(df_now)),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    
+@api_blueprint.route("/random", methods=['GETk'])
+def api_random_topk_rotate_norand():
+    """
+    推薦：完整資料優先 → 取 Top-K(預設100) → 環狀位移 → 可排除最近看過
+    排序：__spacing_sum ↑, __shape_sum ↓, __case_sortkey ↑
+    """
+    try:
+        scope = (request.args.get("scope", "filtered") or "filtered").strip().lower()
+        base_df = apply_filters(DF)
+        if len(base_df) == 0 and scope == "all":
+            base_df = DF.copy()
+
+        base_df = ensure_sort_cols(base_df)
+
+        # 只取完整資料；若沒有完整的就退回全部
+        df_full = base_df[base_df["__complete"]] if "__complete" in base_df.columns else base_df
+        if len(df_full) == 0:
+            df_full = base_df
+        df = df_full.sort_values(
+            by=["__spacing_sum","__shape_sum","__case_sortkey"],
+            ascending=[True, False, True],
+            na_position="last",
+            kind="mergesort",
+        )
+
+        if len(df) == 0:
+            return jsonify({"items": [], "total": 0, "meta": {"k": 0, "used_recent": 0}}), 200
+
+        # n, k
+        try: n = int(request.args.get("n") or 3)
+        except Exception: n = 3
+        n = max(1, min(n, len(df)))
+
+        try: K = int(request.args.get("k") or 100)
+        except Exception: K = 100
+        K = max(n, min(K, len(df)))
+
+        # recent 排除
+        recent_raw = (request.args.get("recent") or "").strip()
+        used_recent = 0
+        if recent_raw:
+            recent_ids = {s.strip() for s in recent_raw.split(",") if s.strip()}
+            key = df["__case_str"].astype(str) if "__case_str" in df.columns else None
+            if key is not None:
+                mask = ~key.isin(recent_ids)
+                used_recent = int((~mask).sum())
+                df2 = df[mask]
+                if len(df2): df = df2
+
+        topk = df.iloc[:K]
+        if len(topk) == 0:
+            return jsonify({"items": [], "total": 0, "meta": {"k": 0, "used_recent": used_recent}}), 200
+
+        off_arg = request.args.get("offset")
+        if off_arg is not None:
+            try: offset = int(off_arg) % len(topk)
+            except Exception: offset = 0
+        else:
+            now = datetime.utcnow()
+            offset = ((now.minute * 60) + now.second) % len(topk)
+
+        idx = list(range(len(topk))) + list(range(len(topk)))
+        pick = idx[offset:offset + min(n, len(topk))]
+        sub = topk.iloc[pick]
+
+        items = [_row_to_item(r) for _, r in sub.iterrows()]
+        resp = jsonify({
+            "items": _clean_json_list(items),
+            "total": int(len(df)),
+            "meta": {"k": int(len(topk)), "used_recent": used_recent, "offset": int(offset)}
+        })
+        r = make_response(resp)
+        r.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        r.headers["Pragma"] = "no-cache"
+        r.headers["Expires"] = "0"
+        return r
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

@@ -322,7 +322,7 @@ function VisualizationPage() {
 								<IconSettings color="white" />
 								{/* {showTaskDetails ? "Settings" : "Settings"} */}
 							</div>
-							{showTaskDetails ? (
+							{/* {showTaskDetails ? ( */}
 								<div
 									className={`hover:bg-gray-700 z-4 cursor-pointer bg-[#0f0824] p-2 ml-4 mt-4 rounded-lg w-fit`}
 									onClick={() => navBack()}
@@ -330,7 +330,7 @@ function VisualizationPage() {
 									<IconHome color="white" />
 									{/* {showTaskDetails ? "Settings" : "Settings"} */}
 								</div>
-							) : null}
+							{/* ) : null} */}
 						</div>
 						<div
 							className={`text-black bg-[#0f0824] m-4 z-3 rounded-lg w-64 p-4 pt-3 gap-3 flex flex-col relative transition-all duration-100 origin-top-left ${

@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
+#root {
+  width: 100vw;
+}
 
 :root {
-font-family: "Inter";
+  font-family: "Inter";
   line-height: 1.5;
   font-weight: 400;
   
@@ -14,6 +17,19 @@ font-family: "Inter";
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+    --bg: #0e1a2b;
+    --panel: #12243b;
+    --panel-soft: #132a45;
+    --ink: #e8eff9;
+    --sub: #a9b7cc;
+    --line: #243a57;
+    --brand: #2a6cff;
+    --brand-ink: #fff;
+    --accent: #febb02;
+    --good: #16a34a;
+    --bad: #ef4444;
+    --control-h: 44px
+
 }
 
 
