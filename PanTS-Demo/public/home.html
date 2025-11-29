@@ -2012,8 +2012,8 @@ try {
     $('#recPlay').textContent = recPlaying ? '⏸' : '▶';
     if (recPlaying) startAuto(); else stopAuto();
   };
-
-  function startAuto() { stopAuto(); recTimer = setInterval(tick, 2600); }
+// 7984 3378 3328
+  function startAuto() { stopAuto(); recTimer = setInterval(tick, 5200); }
   function stopAuto() { if (recTimer) { clearInterval(recTimer); recTimer = null; } }
 
   $('#recPlay').textContent = recPlaying ? '⏸' : '▶';
