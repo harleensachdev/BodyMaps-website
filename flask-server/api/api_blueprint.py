@@ -1,4 +1,4 @@
-from flask import Blueprint, send_file, make_response, request, jsonify
+from flask import Blueprint, send_file, make_response, request, jsonify, Response
 from services.nifti_processor import NiftiProcessor
 from services.session_manager import SessionManager, generate_uuid
 from services.auto_segmentor import run_auto_segmentation
@@ -8,6 +8,7 @@ from models.base import db
 from constants import Constants
 import zipfile
 import pandas as pd
+
 from pathlib import Path
 from io import BytesIO
 from reportlab.pdfgen import canvas
@@ -25,10 +26,46 @@ import uuid
 
 from datetime import datetime, timedelta
 from .utils import *
-api_blueprint = Blueprint('api', __name__)
+import requests  # ⭐ 只在這裡 import 一次 requests
+
+# 建立 blueprint
+api_blueprint = Blueprint("api", __name__)
 last_session_check = datetime.now()
-from flask import Blueprint, request, jsonify
+
 progress_tracker = {}  # {session_id: (start_time, expected_total_seconds)}
+
+
+@api_blueprint.route("/proxy-image")
+def proxy_image():
+    """
+    Proxy image requests so the browser only talks to our own origin.
+    Front-end will call: /api/proxy-image?url=<encoded_hf_url>
+    """
+    raw_url = request.args.get("url")
+    if not raw_url:
+        return Response("Missing url parameter", status=400)
+
+    # 可選安全限制：只允許 HuggingFace 來源
+    if not raw_url.startswith("https://huggingface.co/"):
+        return Response("Forbidden", status=403)
+
+    try:
+        r = requests.get(raw_url, timeout=10)
+    except Exception as e:
+        return Response(f"Upstream error: {e}", status=502)
+
+    if not r.ok:
+        return Response(f"Upstream status {r.status_code}", status=r.status_code)
+
+    content_type = r.headers.get("Content-Type", "image/jpeg")
+
+    resp = Response(r.content, status=200, mimetype=content_type)
+
+    # ⭐ 避免 COEP 再擋圖片
+    resp.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+
+    return resp
+
 
 
 from flask import request, jsonify
@@ -317,6 +354,9 @@ async def get_segmentations(combined_labels_id):
         print("⚠️ Detected float label map, converting to uint8 for Niivue compatibility...")
 
     try:
+        img = nib.load(nifti_path)
+        data = img.get_fdata()
+
         if img.get_data_dtype() != np.uint8:
             
             data_uint8 = data.astype(np.uint8)
@@ -682,12 +722,12 @@ def api_random_topk_rotate_norand():
         if len(df_full) == 0:
             df_full = base_df
         df = df_full.sort_values(
-            by=["__shape_sum"],
-            ascending=[False],
+            by=["__spacing_sum","__shape_sum","__case_sortkey"],
+            ascending=[True, False, True],
             na_position="last",
             kind="mergesort",
         )
-        # df = df.drop_duplicates(subset="__shape_sum", keep="first")
+
         if len(df) == 0:
             return jsonify({"items": [], "total": 0, "meta": {"k": 0, "used_recent": 0}}), 200
 
@@ -712,30 +752,7 @@ def api_random_topk_rotate_norand():
                 df2 = df[mask]
                 if len(df2): df = df2
 
-        wanted_ids = [
-            900,
-            9391,
-            8854,
-            3844,
-            9860,
-            3186,
-            7352,
-            2431,
-            2035,
-            7362,
-            9397,
-            6291,
-            9015,
-            9552,
-            9076,
-            2322,
-            4246,
-            1019,
-            4454,
-            7973
-        ]
-        wanted_ids = [get_panTS_id(w) for w in wanted_ids]
-        topk = df.loc[df["PanTS ID"].isin(wanted_ids)]
+        topk = df.iloc[:K]
         if len(topk) == 0:
             return jsonify({"items": [], "total": 0, "meta": {"k": 0, "used_recent": used_recent}}), 200
 
@@ -747,11 +764,11 @@ def api_random_topk_rotate_norand():
             now = datetime.utcnow()
             offset = ((now.minute * 60) + now.second) % len(topk)
 
-        # idx = list(range(len(topk))) + list(range(len(topk)))
-        # pick = idx[offset:offset + min(n, len(topk))]
-        # sub = topk.iloc[pick] 
+        idx = list(range(len(topk))) + list(range(len(topk)))
+        pick = idx[offset:offset + min(n, len(topk))]
+        sub = topk.iloc[pick]
 
-        items = [row_to_item(r) for _, r in topk.iterrows()]
+        items = [row_to_item(r) for _, r in sub.iterrows()]
         resp = jsonify({
             "items": clean_json_list(items),
             "total": int(len(df)),

@@ -4,9 +4,6 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
     <title>CT Finder · Search + Viewer (Dark)</title>
     <style>
         :root {
@@ -22,13 +19,17 @@
             --good: #16a34a;
             --bad: #ef4444;
             --control-h: 44px
-            /* font-family: 'Inter', sans-serif; */
+        }
+
+        * {
+            box-sizing: border-box
         }
 
         body {
-          background-color: var(--bg);
-          height: 100vh;
-          font-family: "Inter", sans-serif !important;
+            margin: 0;
+            font: 14px/1.55 Inter, system-ui, Segoe UI, Arial;
+            background: var(--bg);
+            color: var(--ink)
         }
 
         .hero {
@@ -37,16 +38,11 @@
         }
 
         .container {
-            max-width: 95vw;
+            max-width: 1400px;
             margin: 0 auto;
             position: relative
         }
-        .hero > .container {
-            padding: 10px 12px;
-            border-radius: 14px;
-            box-shadow: 0 0 0 3px var(--accent) inset;
-            background: var(--panel);
-        }
+
         
 
         .segment {
@@ -73,7 +69,7 @@
             height: var(--control-h);
             display: flex;
             align-items: center;
-            padding: 0px 12px;
+            padding: 10px 12px;
             border: 1px solid var(--line);
             border-radius: 10px;
             background: var(--panel-soft);
@@ -83,6 +79,37 @@
         .input::placeholder {
             color: #7e90ab
         }
+
+        .inputWrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.clearBtn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #9fb3d9;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.clearBtn:hover {
+  color: #fff;
+}
+
+.inputWrap:has(input:not(:placeholder-shown)) .clearBtn {
+  opacity: 1;   /* 有輸入時才顯示 ✕ */
+}
+
 
         .btnSearch {
             height: var(--control-h);
@@ -157,17 +184,19 @@
         }
 
         .main {
-            max-width: 1200px;
-            margin: 16px auto;
-            display: grid;
-            gap: 16px
-        }
+    max-width: 1700px;     /* 跟 .container 一樣寬，整塊內容一起對齊 */
+    margin: 24px auto 64px;
+    display: grid;
+    column-gap: 20px;      /* 左右的 gap 小一點，Results 更靠左 */
+    row-gap: 24px;
+}
 
-        @media(min-width:1100px) {
-            .main {
-                grid-template-columns: 300px 1fr
-            }
-        }
+@media (min-width:1100px) {
+    .main {
+        grid-template-columns: 260px minmax(0, 1fr);  /* Advanced 變窄 */
+    }
+}
+
 
         .panel {
             background: var(--panel);
@@ -241,7 +270,6 @@
         }
 
         .recTitle {
-            color: var(--ink);
             font-weight: 900;
             margin: 4px 0 8px
         }
@@ -251,26 +279,23 @@
         }
 
         .recScroll {
-            display: flex;
-            gap: 12px;
-            overflow: auto;
-            padding-bottom: 8px;
-            scroll-snap-type: x mandatory;
-            scrollbar-width: none
-        }
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 0 16px;
+}
 
         .recScroll::-webkit-scrollbar {
-            display: none
-        }
+  display: none;
+}
 
         .recCard {
-            min-width: 320px;
-            scroll-snap-align: start;
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            background: var(--panel);
-            overflow: hidden
-        }
+  flex: 0 0 320px;
+  scroll-snap-align: start;
+}
 
         .recThumb {
             width: 100%;
@@ -347,8 +372,7 @@
         }
 
         .counter {
-            font-weight: 900;
-            color: var(--ink)
+            font-weight: 900
         }
 
         .select {
@@ -826,7 +850,7 @@
 /* Hero section 單層深藍背景 */
 .hero {
     background: var(--bg);
-    padding: 22px 0px 18px;
+    padding: 22px 16px 18px;
 }
 
 /* Search Rail 調整：Search 按鈕固定在右邊 */
@@ -835,6 +859,9 @@
     align-items: center;
     gap: 8px;
     background: var(--panel);
+    border-radius: 14px;
+    padding: 6px 10px;
+    box-shadow: 0 0 0 3px var(--accent) inset;
 }
 
 /* 讓 ID 與 STA 部分撐滿 */
@@ -1130,70 +1157,143 @@ body.viewer-open .hero {
   max-width: 560px;
   width: 100%;
 }
+.optRow.disabled { opacity: .45; pointer-events: none; }
+.optRow.disabled .count { opacity: .8; }
+
+
+/* 單一卡片：往右微調 */
+#cards.centerOne .card {
+  flex: 0 0 360px;
+  max-width: 360px;
+  width: 100%;
+  padding-left: 0 !important;
+  margin-left: 120px;   /* ✅ 關鍵：控制往右的程度，120px 可再微調 */
+}
+
+/* === Search bar 下拉：各自對齊上方框框 === */
+
+/* ID / Tumor-Sex-Age 這兩個 segment 自己當定位參考 */
+.searchRail > .segment.pop {
+  position: relative;
+}
+
+/* 下拉面板：寬度 = 自己的 segment 寬度，正好貼在下面 */
+.searchRail > .segment.pop .popPanel {
+  top: calc(100% + 6px);   /* 緊貼在該框框下面一點點 */
+  left: 0;
+  right: auto;
+  width: 100% !important;
+  max-width: none;
+  transform: none !important;   /* ← 這行把原本的 translateX(-50%) 拿掉 */
+}
+
+/* 小螢幕時一樣貼齊自己，不會超出畫面 */
+@media (max-width: 600px) {
+  .searchRail > .segment.pop .popPanel {
+    width: 100% !important;
+  }
+}
+ /* 讓 ID 推薦面板跟上面黃框對齊，不要往左凸出去 */
+  #popID {
+    position: relative;
+  }
+
+  #popID .popPanel {
+    left: 42px !important;                    /* 往右移一點點，可視情況改成 6~10px */
+    width: calc(100% - 24px) !important;     /* 左右各留 8px，跟上面輸入框對齊 */
+    max-width: 515px;                        /* 保留原本最大寬度 */
+  }
+
+    /* 讓 Tumor / Sex / Age 的下拉面板跟上面藍色框對齊 */
+  #popSTA {
+    position: relative;
+  }
+
+  #popSTA .popPanel {
+    left: 8px !important;                    /* 往右移一點，可微調 6–10px */
+    width: calc(100% - 16px) !important;     /* 左右各留 8px，內縮與上方輸入框一致 */
+    max-width: none;                         /* 如果你有設 max-width，可視需要保留或移除 */
+  }
+
 
     </style>
 </head>
 
 <body>
+<!-- <button id="homeBtn" class="home-btn" title="Home" aria-label="Home">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+    <path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/>
+  </svg>
+</button> -->
 
 <!-- ✅ Search Section -->
-<section class="hero">
-  <div class="container">
-    <div class="searchRail">
-      <!-- ID -->
-      <div class="segment pop" id="popID">
-        <label>ID</label>
-        <input id="q" class="input popBtn" placeholder="Search Case ID or keyword…" autocomplete="off">
-        <div class="popPanel" style="width:520px">
-          <div class="group">
-            <div class="groupTitle">Recommended IDs</div>
-            <div id="idReco" class="chips"></div>
+<!-- ✅ Search Section -->
+<div class="searchBarWrapper">
+  <section class="hero">
+    <div class="container">
+      <div class="searchRail">
+        <!-- ID -->
+        <div class="segment pop" id="popID">
+          <label>ID</label>
+          <div class="inputWrap">
+            <input id="q" class="input popBtn" placeholder="Search Case ID or keyword…" autocomplete="off">
+            <button id="clearBtn" class="clearBtn" title="Clear" aria-label="Clear">×</button>
           </div>
-          <div class="group">
-            <div class="groupTitle">Recently viewed</div>
-            <div id="idRecent" class="chips"><span class="recMeta">No recent</span></div>
+
+          <div class="popPanel" style="width:520px">
+            <div class="group">
+              <div class="groupTitle">Recommended IDs</div>
+              <div id="idReco" class="chips"></div>
+            </div>
+            <div class="group">
+              <div class="groupTitle">Recently viewed</div>
+              <div id="idRecent" class="chips">
+                <span class="recMeta">No recent</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- STA -->
-      <div class="segment pop" id="popSTA">
-        <button class="fakeInput popBtn" type="button">
-          <span id="staSummary">Any tumor · Any sex · Any age</span>
-        </button>
+        <!-- STA -->
+        <div class="segment pop" id="popSTA">
+          <button class="fakeInput popBtn" type="button">
+            <span id="staSummary">Any tumor · Any sex · Any age</span>
+          </button>
 
-        <div class="popPanel" style="max-width:560px">
-          <div class="group">
-            <div class="groupTitle">Tumor</div>
-            <div id="tumorChips" class="chips">
-              <button class="chip" data-tumor="">Any</button>
-              <button class="chip flat" data-tumor="1">Tumor</button>
-              <button class="chip flat" data-tumor="0">No tumor</button>
+          <div class="popPanel" style="max-width:560px">
+            <div class="group">
+              <div class="groupTitle">Tumor</div>
+              <div id="tumorChips" class="chips">
+                <button class="chip" data-tumor="">Any</button>
+                <button class="chip flat" data-tumor="1">Tumor</button>
+                <button class="chip flat" data-tumor="0">No tumor</button>
+              </div>
+            </div>
+
+            <div class="group">
+              <div class="groupTitle">Sex <span class="hint">Multi-Select</span></div>
+              <div id="sexChips" class="chipArea flat">
+                <button class="chip" data-sex="">Any</button>
+                <button class="chip" data-sex="M">Male</button>
+                <button class="chip" data-sex="F">Female</button>
+                <button class="chip" data-sex="U">Unknown</button>
+              </div>
+            </div>
+
+            <div class="group">
+              <div class="groupTitle">Age <span class="hint">Multi-Select</span></div>
+              <div id="ageChips" class="chipArea flat"></div>
             </div>
           </div>
+        </div>
 
-          <div class="group">
-            <div class="groupTitle">Sex <span class="hint">Multi-Select</span></div>
-            <div id="sexChips" class="chipArea flat">
-              <button class="chip" data-sex="">Any</button>
-              <button class="chip" data-sex="M">Male</button>
-              <button class="chip" data-sex="F">Female</button>
-              <button class="chip" data-sex="U">Unknown</button>
-            </div>
-          </div>
+        <!-- Search button -->
+        <button id="searchBtn" class="btnSearch" type="button">Search</button>
+      </div> <!-- /.searchRail -->
+    </div>   <!-- /.container -->
+  </section>
+</div> <!-- /.searchBarWrapper -->
 
-          <div class="group">
-            <div class="groupTitle">Age <span class="hint">Multi-Select</span></div>
-            <div id="ageChips" class="chipArea flat"></div>
-          </div>
-        </div> <!-- /popPanel -->
-      </div> <!-- /segment popSTA -->
-
-      <!-- ✅ Search button fixed at right -->
-      <button id="searchBtn" class="btnSearch" type="button">Search</button>
-    </div> <!-- /.searchRail -->
-  </div>
-</section>
 
 <style>
 /* === 修正版 Search Rail 樣式 === */
@@ -1205,6 +1305,8 @@ body.viewer-open .hero {
   gap: 8px;
   background: var(--panel);
   border-radius: 14px;
+  padding: 6px 10px;
+  box-shadow: 0 0 0 3px var(--accent) inset;
   position: relative;
   overflow: visible;
 }
@@ -1246,6 +1348,10 @@ body.viewer-open .hero {
   position: relative;
 }
 
+.hero > .container {
+  padding: 0px !important;
+}
+
 /* 確保樣式一致 */
 .fakeInput {
   width: 100%;
@@ -1274,6 +1380,89 @@ body.viewer-open .hero {
   max-width: 560px;
   width: 100%;
 }
+.home-btn{
+  position: fixed; top: 25px; left: 40px;
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  background: #2a3342; color: #e6ecff;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.25);
+  cursor: pointer; z-index: 9999;
+}
+.home-btn:hover{ filter: brightness(1.08); }
+.home-btn:active{ transform: translateY(1px); }
+/* =========================================================
+   ❶ Advanced 整欄變窄（從 340–400px → 260px）
+   ========================================================= */
+.main, .content, .twoCols {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr); /* 左 260px、右自動 */
+  gap: 20px;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* Advanced 面板本身寬度 */
+#filters {
+  width: 100%;
+  max-width: 260px;
+}
+
+/* 字體略縮小，讓整欄更緊實 */
+#filters,
+#filters * {
+  font-size: 13px !important;
+}
+
+/* 行距縮小 */
+.fset .optRow {
+  padding: 1px 0;
+}
+
+/* “Show more” 按鈕對齊收窄 */
+.fset .showMore {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+/* =========================================================
+   ❷ Results 往左貼齊（包含 Results Head 與 Sort by）
+   ========================================================= */
+
+/* Results 標題列往左收回 */
+.resultsHead {
+  padding-left: 0 !important;
+}
+
+/* Sort by 下拉選單靠左，與 Results 對齊 */
+.resultsHead select {
+  margin-right: 0 !important;
+}
+
+/* 卡片主體區塊往左貼齊（移除多餘空白） */
+#resultsPanel {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* 卡片容器 grid 左右無額外間距 */
+#cards {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* 如果是單筆 → 不要偏移 */
+#resultsPanel.single {
+  margin-left: 0 !important;
+  width: 100% !important;
+}
+.resultsHead.single {
+  margin-left: 0 !important;
+}
 
 </style>
 <style>
@@ -1282,21 +1471,17 @@ body.viewer-open .hero {
     display: grid;
     grid-template-columns: 380px minmax(0, 1fr); /* 左側 Advanced 380px，可依需要改 */
     gap: 20px; /* 中間距離稍微縮小 */
-    max-width: 100%;
+      max-width: 1600px;
     width: 100%;
     margin: 0 auto;
-    /* padding-left: 20px;   左右外邊界都縮小 */
-    /* padding-right: 20px; */
+    padding-left: 20px;   /* 左右外邊界都縮小 */
+    padding-right: 20px;
   }
 
   /* Advanced（左側） */
   #filters, .facetPanel {
     width: 100%;
-    position: sticky;
-    height: 100vh;
-    overflow: auto;
-    top: 0;
-    max-width: 360px;
+    max-width: 400px;
   }
 
   /* Results（右側卡片區） */
@@ -1308,14 +1493,14 @@ body.viewer-open .hero {
  /* 卡片區：桌機 3 欄、平板 2 欄、手機 1 欄；支援單筆置中 */
 #cards{
   display: grid;
-  grid-template-columns: repeat(3, min(320px, 1fr));
+  grid-template-columns: repeat(3, minmax(320px, 1fr));
   gap: 24px;
   align-items: stretch;
 }
 
 /* 窄一點的螢幕：2 欄（多筆結果時仍用 grid） */
 @media (max-width: 1200px){
-  #cards{ grid-template-columns: repeat(2, min(300px, 1fr)); gap: 20px; }
+  #cards{ grid-template-columns: repeat(2, minmax(300px, 1fr)); gap: 20px; }
 }
 
 /* 手機：1 欄 */
@@ -1337,14 +1522,14 @@ body.viewer-open .hero {
     padding-right: 40px;
   }
   #cards{
-    grid-template-columns: repeat(3, min(360px, 1fr));
+    grid-template-columns: repeat(3, minmax(360px, 1fr));
     gap: 26px;
   }
   .card .thumb{ height: 340px; }
 }
 
 /* 在較小螢幕下自動收窄左側 Advanced 與右側內容 */
-@media (max-width: 1300px) {
+@media (max-width: 1600px) {
   .main, .content, .twoCols {
     grid-template-columns: 340px minmax(0, 1fr);
     padding-left: 16px;
@@ -1570,232 +1755,450 @@ body.viewer-open .hero {
   color: #ef4444;  /* 紅色 */
 }
 
+
+/* 使整個 search bar 與內容統一最大寬度 */
+.mainContainer,
+.searchBarWrapper,
+.resultsHead,
+#resultsPanel,
+#recBar {
+  max-width: 1800px;   /* 你可以改成 1500 / 1700 / 1800 */
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+/* 搜尋欄黃色框外層 */
+.searchBarWrapper {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* Browse 區塊統一寬度 */
+#recBar {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* Results 卡片區塊統一左右間距 */
+#resultsPanel {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+</style>
+<style>
+  /* === 統一版面寬度 === */
+  .hero .container,
+  section.main {
+    max-width: 1350px;      /* 搜尋列、Advanced、Results 一樣寬 */
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* 左側 Advanced + 右側 Results 的 grid */
+  section.main {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr); /* 左 280px、右吃滿 */
+    column-gap: 24px;
+    align-items: flex-start;
+  }
+
+  /* Advanced 不要再另外往右推 */
+  #filters {
+    width: 100%;
+    max-width: 280px;
+    margin-left: -12px !important;
+  }
+
+
+
+  /* Results 不要再整欄 margin-left */
+  #resultsPanel {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    width: 100%;
+  }
+
+  /* Results 標題列（Results: / sort by）左右貼齊容器 */
+  .resultsHead {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+</style>
+<style>
+  /* 卡片 grid：桌機 3 欄，自動縮成 2 / 1 欄 */
+  #cards {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(300px, 1fr));
+    gap: 24px;               /* 卡片彼此間距 */
+    padding: 16px 0 24px !important;
+  }
+
+  /* 1200px 以下：2 欄 */
+  @media (max-width: 1200px) {
+    #cards {
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 20px;
+    }
+  }
+
+  /* 768px 以下：1 欄 */
+  @media (max-width: 768px) {
+    #cards {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+  }
+
+  /* 卡片本身不要再被限制得太窄 */
+  #cards .card,
+  #cards .caseCard {
+    max-width: none !important;
+    width: 100%;
+  }
+
+  /* 縮圖高度統一，大一點比較好看 */
+  #cards .card .thumb,
+  #cards .caseCard img {
+    height: 260px !important;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  /* 單筆結果時，不要再亂偏移，保持置中 */
+  #resultsPanel.single {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  #cards.centerOne {
+    justify-content: center;
+    padding-left: 0 !important;
+  }
+  #cards.centerOne .card {
+    flex: 0 0 340px;
+    max-width: 340px;
+  }
+
+/* === Advanced 側欄：排版最終版 === */
+
+/* 每一列：checkbox + 文字 + 數字，排成一行 */
+#filters .optRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* label 只包 checkbox + 文字，不要撐到整行 */
+#filters .optRow label {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+/* checkbox 小間距 */
+#filters .optRow input[type="checkbox"] {
+  margin-right: 6px;
+}
+
+/* 數字就是跟在 label 後面，不往右推，也不要換行 */
+#filters .optRow > span,
+#filters .optRow > .count,
+#filters .optRow > .num {
+  white-space: nowrap;      /* 不拆行 */
+  margin-left: 4px;
+  margin-right: 0;
+  text-align: left;
+}
+
+/* 保險：清掉可能殘留的 float */
+#filters .optRow > * {
+  float: none !important;
+}
+
+</style>
+
+<style>
+  /* 修正 Advanced 欄位被撐太寬導致數字被蓋住的問題 */
+  #filters,
+  .filters {
+    width: 100%;
+    max-width: 280px;       /* 你希望的 Advanced 寬度，可改 260/300 */
+    min-width: 0 !important;/* 把之前 min-width:340px 強制關掉 */
+    box-sizing: border-box;
+  }
+
+ /* === 統一版面寬度 === */
+.hero .container,
+section.main,
+section#recBar {           /* ⭐ 把 Browse 也拉進來一起對齊 */
+  max-width: 1350px;      /* 搜尋列、Browse、Advanced、Results 一樣寬 */
+  margin: 0 auto;
+  padding: 0 24px;
+}
+</style>
+
+<style>
+  /* 單一結果版：不要橫向偏移，卡片置中即可 */
+
+  /* Results 標題列正常靠左，不再整欄位移 */
+  .resultsHead.single {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* 右側結果容器不要再被推開，吃滿右邊欄位 */
+  #resultsPanel.single {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* 卡片容器：改用 flex 置中，而不是整欄往右推 */
+  #cards.centerOne {
+    display: flex !important;
+    justify-content: center !important;   /* 如果想靠左改成 flex-start */
+    align-items: flex-start;
+    gap: 24px;
+    padding-left: 0 !important;
+  }
+
+  /* 單一卡片的寬度（可依你喜好微調） */
+  #cards.centerOne .card {
+    flex: 0 0 360px;
+    max-width: 360px;
+    width: 100%;
+    padding-left: 0 !important;
+  }
 </style>
 
 
-      <!-- Browse -->
-      <section class="panel container recBar" id="recBar">
-          <div class="recTitle">Browse</div>
-          <div class="recViewport">
-              <button class="recCtrl recPrev" id="recPrev" title="Previous">‹</button>
-              <button class="recCtrl recNext" id="recNext" title="Next">›</button>
-              <button class="recPlay" id="recPlay" title="Pause/Play">⏸</button>
-              <div id="recScroll" class="recScroll"></div>
-          </div>
-      </section>
-
-      <!-- Main -->
-  <section class="main container">
-    <aside id="filters" class="filters panel">
-      <div class="secTitle">Advanced</div>
-
-      <!-- CT phase -->
-      <div class="fset" id="fs_ct">
-        <div class="groupTitle">CT phase</div>
-        <div class="optRow">
-          <label><input type="checkbox" data-k="ct_phase" value="" checked> Any</label>
+    <!-- Browse -->
+    <section class="panel container recBar" id="recBar">
+        <div class="recTitle">Browse</div>
+        <div class="recViewport">
+            <button class="recCtrl recPrev" id="recPrev" title="Previous">‹</button>
+            <button class="recCtrl recNext" id="recNext" title="Next">›</button>
+            <button class="recPlay" id="recPlay" title="Pause/Play">⏸</button>
+            <div id="recScroll" class="recScroll"></div>
         </div>
-        <div id="ct_phase_opts"></div>
-        <button class="showMore" data-target="ct_phase_opts" data-limit="12">Show more</button>
-      </div>
-
-      <!-- Manufacturer -->
-      <div class="fset" id="fs_mfr">
-        <div class="groupTitle">Manufacturer</div>
-        <div class="optRow">
-          <label><input type="checkbox" data-k="manufacturer" value="" checked> Any</label>
-        </div>
-        <div id="manufacturer_opts"></div>
-        <button class="showMore" data-target="manufacturer_opts" data-limit="12">Show more</button>
-      </div>
-
-      <!-- Model -->
-      <div class="fset" id="fs_model">
-        <div class="groupTitle">Model</div>
-        <div class="optRow">
-          <label><input type="checkbox" data-k="model" value="" checked> Any</label>
-        </div>
-        <div id="model_opts"></div>
-        <button class="showMore" data-target="model_opts" data-limit="12">Show more</button>
-      </div>
-
-      <!-- Study type -->
-      <div class="fset" id="fs_type">
-        <div class="groupTitle">Study type</div>
-        <div class="optRow">
-          <label><input type="checkbox" data-k="study_type" value="" checked> Any</label>
-        </div>
-        <div id="type_opts"></div>
-        <button class="showMore" data-target="type_opts" data-limit="12">Show more</button>
-      </div>
-
-      <!-- Site nationality -->
-      <div class="fset" id="fs_nat">
-        <div class="groupTitle">Site nationality</div>
-        <div class="optRow">
-          <label><input type="checkbox" data-k="site_nat" value="" checked> Any</label>
-        </div>
-        <div id="nat_opts"></div>
-        <button class="showMore" data-target="nat_opts" data-limit="12">Show more</button>
-      </div>
-
-      <!-- Study year -->
-      <div class="fset" id="fs_year">
-        <div class="groupTitle">Study year</div>
-        <div class="optRow">
-          <label><input type="checkbox" data-k="year" value="" checked> Any</label>
-        </div>
-        <div id="year_opts"></div>
-        <button class="showMore" data-target="year_opts" data-limit="20">Show more</button>
-      </div>
-    </aside>
-
-    <section id="resultsPanel" class="panel" style="display:none">
-      <div class="resultsHead" style="display:none">
-        <div id="counter" class="counter">Results: 0 cases</div>
-        <select id="sortBy" class="select">
-          <option value="quality">Quality (high → low)</option>
-          <option value="spacing_asc">Spacing (low → high)</option>
-          <option value="shape_desc">Shape score (high → low)</option>
-          <option value="age_asc">Age (young → old)</option>
-          <option value="age_desc">Age (old → young)</option>
-          <option value="id_asc">ID (low → high)</option>
-          <option value="id_desc">ID (high → low)</option>
-        </select>
-      </div>
-      <div id="cards" class="cards" aria-live="polite" style="display:none"></div>
     </section>
+
+    <!-- Main -->
+<section class="main container">
+  <aside id="filters" class="filters panel">
+    <div class="secTitle">Advanced</div>
+
+    <!-- CT phase -->
+    <div class="fset" id="fs_ct">
+      <div class="groupTitle">CT phase</div>
+      <div class="optRow">
+        <label><input type="checkbox" data-k="ct_phase" value="" checked> Any</label>
+      </div>
+      <div id="ct_phase_opts"></div>
+      <button class="showMore" data-target="ct_phase_opts" data-limit="12">Show more</button>
+    </div>
+
+    <!-- Manufacturer -->
+    <div class="fset" id="fs_mfr">
+      <div class="groupTitle">Manufacturer</div>
+      <div class="optRow">
+        <label><input type="checkbox" data-k="manufacturer" value="" checked> Any</label>
+      </div>
+      <div id="manufacturer_opts"></div>
+      <button class="showMore" data-target="manufacturer_opts" data-limit="12">Show more</button>
+    </div>
+
+    <!-- Model -->
+    <div class="fset" id="fs_model">
+      <div class="groupTitle">Model</div>
+      <div class="optRow">
+        <label><input type="checkbox" data-k="model" value="" checked> Any</label>
+      </div>
+      <div id="model_opts"></div>
+      <button class="showMore" data-target="model_opts" data-limit="12">Show more</button>
+    </div>
+
+    <!-- Study type -->
+    <div class="fset" id="fs_type">
+      <div class="groupTitle">Study type</div>
+      <div class="optRow">
+        <label><input type="checkbox" data-k="study_type" value="" checked> Any</label>
+      </div>
+      <div id="type_opts"></div>
+      <button class="showMore" data-target="type_opts" data-limit="12">Show more</button>
+    </div>
+
+    <!-- Site nationality -->
+    <div class="fset" id="fs_nat">
+      <div class="groupTitle">Site nationality</div>
+      <div class="optRow">
+        <label><input type="checkbox" data-k="site_nat" value="" checked> Any</label>
+      </div>
+      <div id="nat_opts"></div>
+      <button class="showMore" data-target="nat_opts" data-limit="12">Show more</button>
+    </div>
+
+    <!-- Study year -->
+    <div class="fset" id="fs_year">
+      <div class="groupTitle">Study year</div>
+      <div class="optRow">
+        <label><input type="checkbox" data-k="year" value="" checked> Any</label>
+      </div>
+      <div id="year_opts"></div>
+      <button class="showMore" data-target="year_opts" data-limit="20">Show more</button>
+    </div>
+  </aside>
+
+  <section id="resultsPanel" class="panel" style="display:none">
+    <div class="resultsHead" style="display:none">
+      <div id="counter" class="counter">Results: 0 cases</div>
+      <select id="sortBy" class="select">
+        <option value="quality">Quality (high → low)</option>
+        <option value="spacing_asc">Spacing (low → high)</option>
+        <option value="shape_desc">Shape score (high → low)</option>
+        <option value="age_asc">Age (young → old)</option>
+        <option value="age_desc">Age (old → young)</option>
+        <option value="id_asc">ID (low → high)</option>
+        <option value="id_desc">ID (high → low)</option>
+      </select>
+    </div>
+    <div id="cards" class="cards" aria-live="polite" style="display:none"></div>
   </section>
+</section>
 
 
-      <!-- Preparing Page -->
-      <div id="prepPage" class="prepPage" aria-hidden="true">
-          <div class="prepBox">
-              <img id="prepImg" src="" alt=""
-                  style="width:180px;height:110px;border-radius:12px;background:#dcd7ce;display:block;margin:0 auto 12px;">
-              <div class="prepTitle">Preparing data...</div>
-              <div class="prepHint">‹ pancreas ›</div>
-          </div>
-      </div>
+    <!-- Preparing Page -->
+    <div id="prepPage" class="prepPage" aria-hidden="true">
+        <div class="prepBox">
+            <img id="prepImg" src="" alt=""
+                style="width:180px;height:110px;border-radius:12px;background:#dcd7ce;display:block;margin:0 auto 12px;">
+            <div class="prepTitle">Preparing data...</div>
+            <div class="prepHint">‹ pancreas ›</div>
+        </div>
+    </div>
 
-      <!-- Viewer -->
-      <section id="viewer" class="viewer" aria-hidden="true">
-          <div class="v-toolbar">
-              <button class="iconBtn" id="btnBack" title="Back to search">↩</button>
-              <button class="iconBtn" id="btnGear" title="Viewer settings">⚙️</button>
-              <button class="iconBtn" id="btnClassMap" style="display:none" aria-hidden="true">🗺️</button>
-          </div>
+    <!-- Viewer -->
+    <section id="viewer" class="viewer" aria-hidden="true">
+        <div class="v-toolbar">
+            <button class="iconBtn" id="btnBack" title="Back to search">↩</button>
+            <button class="iconBtn" id="btnGear" title="Viewer settings">⚙️</button>
+            <button class="iconBtn" id="btnClassMap" style="display:none" aria-hidden="true">🗺️</button>
+        </div>
 
-          <aside class="v-sidebar" id="vSidebar" style="display:none">
-              <div class="cm">
-                  <div class="cm-head">
-                      <h3 style="margin:0">Organs</h3>
-                      <button class="toggleAll" id="toggleAll">Toggle all</button>
-                  </div>
-                  <div id="cmRoot"></div>
-              </div>
-          </aside>
+        <aside class="v-sidebar" id="vSidebar" style="display:none">
+            <div class="cm">
+                <div class="cm-head">
+                    <h3 style="margin:0">Organs</h3>
+                    <button class="toggleAll" id="toggleAll">Toggle all</button>
+                </div>
+                <div id="cmRoot"></div>
+            </div>
+        </aside>
 
-          <div class="v-card" id="vCard" style="display:none">
-              <h5 id="caseTitle" style="margin:2px 0 8px">Case ID: —</h5>
-              <div class="row"><label style="min-width:95px;color:#9aa3b2">Label Opacity</label><input id="op"
-                      type="range" min="0" max="100" value="60"><span id="opv" class="value">60</span></div>
-              <div class="row"><label style="min-width:95px;color:#9aa3b2">Level</label><input id="lvl" type="range"
-                      min="-200" max="200" value="50"><span id="lvlv" class="value">50</span></div>
-              <div class="row"><label style="min-width:95px;color:#9aa3b2">Window</label><input id="win" type="range"
-                      min="100" max="2000" value="400"><span id="winv" class="value">400</span></div>
+        <div class="v-card" id="vCard" style="display:none">
+            <h5 id="caseTitle" style="margin:2px 0 8px">Case ID: —</h5>
+            <div class="row"><label style="min-width:95px;color:#9aa3b2">Label Opacity</label><input id="op"
+                    type="range" min="0" max="100" value="60"><span id="opv" class="value">60</span></div>
+            <div class="row"><label style="min-width:95px;color:#9aa3b2">Level</label><input id="lvl" type="range"
+                    min="-200" max="200" value="50"><span id="lvlv" class="value">50</span></div>
+            <div class="row"><label style="min-width:95px;color:#9aa3b2">Window</label><input id="win" type="range"
+                    min="100" max="2000" value="400"><span id="winv" class="value">400</span></div>
 
-              <button id="openClassMap" class="btn" style="width:100%;margin-top:10px">Class Map</button>
-              <div class="v-actions">
-                  <button id="zoomIn" class="toolBtn" title="Zoom in"></button>
-                  <button id="zoomOut" class="toolBtn" title="Zoom out"></button>
-                  <button id="download" class="toolBtn" title="Download"></button>
-                  <button id="report" class="toolBtn" title="Report"></button>
-              </div>
-          </div>
+            <button id="openClassMap" class="btn" style="width:100%;margin-top:10px">Class Map</button>
+            <div class="v-actions">
+                <button id="zoomIn" class="toolBtn" title="Zoom in"></button>
+                <button id="zoomOut" class="toolBtn" title="Zoom out"></button>
+                <button id="download" class="toolBtn" title="Download"></button>
+                <button id="report" class="toolBtn" title="Report"></button>
+            </div>
+        </div>
 
-          <main class="v-stage">
-              <section class="v-view">
-                  <h4>Axial</h4><img id="axial" alt="axial">
-              </section>
-              <section class="v-view">
-                  <h4>Sagittal</h4><img id="sagittal" alt="sagittal">
-              </section>
-              <section class="v-view">
-                  <h4>Coronal</h4><img id="coronal" alt="coronal">
-              </section>
-              <section class="v-view">
-                  <h4>3D</h4>
-                  <div class="center" id="prep">
-                      <div class="mini"></div>
-                      <div>Preparing data…</div>
-                      <div style="color:#8ea6ff;margin-top:4px">‹ pancreas ›</div>
-                  </div>
-              </section>
-          </main>
-      </section>
+        <main class="v-stage">
+            <section class="v-view">
+                <h4>Axial</h4><img id="axial" alt="axial">
+            </section>
+            <section class="v-view">
+                <h4>Sagittal</h4><img id="sagittal" alt="sagittal">
+            </section>
+            <section class="v-view">
+                <h4>Coronal</h4><img id="coronal" alt="coronal">
+            </section>
+            <section class="v-view">
+                <h4>3D</h4>
+                <div class="center" id="prep">
+                    <div class="mini"></div>
+                    <div>Preparing data…</div>
+                    <div style="color:#8ea6ff;margin-top:4px">‹ pancreas ›</div>
+                </div>
+            </section>
+        </main>
+    </section>
 
-      <!-- Report Modal -->
-      <div id="reportModal" class="modal" aria-hidden="true">
-          <div class="modalBox">
-              <div class="modalHead">
-                  <h3 style="margin:0">Case Report</h3>
-                  <button id="rpClose" class="iconBtn sm">✕</button>
-              </div>
-              <div class="modalBody">
-                  <p style="color:#9aa3b2">Report content goes here…</p>
-              </div>
-          </div>
-      </div>
+    <!-- Report Modal -->
+    <div id="reportModal" class="modal" aria-hidden="true">
+        <div class="modalBox">
+            <div class="modalHead">
+                <h3 style="margin:0">Case Report</h3>
+                <button id="rpClose" class="iconBtn sm">✕</button>
+            </div>
+            <div class="modalBody">
+                <p style="color:#9aa3b2">Report content goes here…</p>
+            </div>
+        </div>
+    </div>
+
     <script>
-let apiUrl;
-if (location.hostname === "localhost") {
-  apiUrl = "http://localhost:5173";
-} else {
-  apiUrl = "https://api.pantsview.com";
-}
+
 // 顯示「Results: …」/ 設定總數
 function setResultsLoading(on = true) {
-const el = document.querySelector('#resCount, .resultsHead .counter');
-if (!el) return;
-el.textContent = on ? 'Results: …' : el.textContent;
+  const el = document.querySelector('#resCount, .resultsHead .counter');
+  if (!el) return;
+  el.textContent = on ? 'Results: …' : el.textContent;
 }
 
 function setResultsCount(n) {
-const el = document.querySelector('#resCount, .resultsHead .counter');
-if (!el) return;
-el.textContent = `Results: ${n} ${n === 1 ? 'case' : 'cases'}`;
+  const el = document.querySelector('#resCount, .resultsHead .counter');
+  if (!el) return;
+  el.textContent = `Results: ${n} ${n === 1 ? 'case' : 'cases'}`;
 }
 
 
 /* ===== helpers ===== */
 // ✅ 安全版本（避免重複宣告）
 window._showEl = window._showEl || function (sel, on) {
-const n = typeof sel === 'string' ? document.querySelector(sel) : sel;
-if (!n) return;
-if (on) n.style.removeProperty('display');
-else n.style.display = 'none';
+  const n = typeof sel === 'string' ? document.querySelector(sel) : sel;
+  if (!n) return;
+  if (on) n.style.removeProperty('display');
+  else n.style.display = 'none';
 };
 
 
 
 // --- Profile helpers (HuggingFace) ---
+// ⭐ 先放 pad8
 function pad8(n){
-const s = String(n ?? '').replace(/\D/g, '');
-return s ? s.padStart(8, '0') : '';
+  const s = String(n ?? '').replace(/\D/g, '');
+  return s ? s.padStart(8, '0') : '';
 }
-async function profileURL(idNum){
-const p = pad8(idNum);
-if (!p) return '';
-const res = await fetch(`https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/profile_only/PanTS_${p}/profile.jpg`);
-if (!res.ok) return '';
-const data = await res.blob();
-const url = URL.createObjectURL(data);
-return url;
+
+// ⭐ 再放 profileURL
+function profileURL(idNum){
+  const p = pad8(idNum);
+  if (!p) return '';
+
+  const raw = `https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/profile_only/PanTS_${p}/profile.jpg`;
+
+  // 走 proxy 來避免 COEP 擋
+  return `/api/proxy-image?url=${encodeURIComponent(raw)}`;
 }
+
 function extractNumFromId(idStr){
-const m = String(idStr || '').match(/\d+/);
-return m ? Number(m[0]) : NaN;
+  const m = String(idStr || '').match(/\d+/);
+  return m ? Number(m[0]) : NaN;
 }
 
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
@@ -1803,21 +2206,21 @@ const svg = (t, b = '#0f223b', f = '#94a3b8') => 'data:image/svg+xml;charset=utf
 const vsvg = t => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#0a0d18"/><text x="50%" y="50%" fill="#9aa3b2" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-size="16">${t}</text></svg>`);
 
 const state = {
-q: '',
-sex: [],            // ['M','F','UNKNOWN']
-tumor: '',
-age_from: '',
-age_to: '',
-age_bin: [],        // ['0-9','10-19',...,'90-99','UNKNOWN']
-sort_by: 'quality',
-ct_phase: [],
-manufacturer: [],
-model: [],
-study_type: [],
-site_nat: [],
-year: [],
-per_page: 10000,
-page: 1
+  q: '',
+  sex: [],            // ['M','F','UNKNOWN']
+  tumor: '',
+  age_from: '',
+  age_to: '',
+  age_bin: [],        // ['0-9','10-19',...,'90-99','UNKNOWN']
+  sort_by: 'quality',
+  ct_phase: [],
+  manufacturer: [],
+  model: [],
+  study_type: [],
+  site_nat: [],
+  year: [],
+  per_page: 10000,
+  page: 1
 };
 
 let ALL_ITEMS = [], lastFetched = [];
@@ -1825,233 +2228,359 @@ let HAS_SEARCHED = false;
 
 /* ---- UI helpers (safe, no re-declare) ---- */
 window._toggleEl = window._toggleEl || function (selOrNode, on) {
-const n = (typeof selOrNode === 'string') ? document.querySelector(selOrNode) : selOrNode;
-if (!n) return;
-if (on) n.style.removeProperty('display'); else n.style.display = 'none';
+  const n = (typeof selOrNode === 'string') ? document.querySelector(selOrNode) : selOrNode;
+  if (!n) return;
+  if (on) n.style.removeProperty('display'); else n.style.display = 'none';
 };
 
 /* ---- Panels / Results refresh ---- */
 function updatePanels() {
-const searched = !!HAS_SEARCHED;
-const count = searched ? (Number(window.LAST_TOTAL ?? (lastFetched?.length || 0)) || 0) : 0;
+  const searched = !!HAS_SEARCHED;
+  const count = searched ? (Number(window.LAST_TOTAL ?? (lastFetched?.length || 0)) || 0) : 0;
 
-// 想要 0 筆也顯示 Results 標題：head、panel 都跟著 searched 顯示
-const showHead   = searched;               // 0 筆也顯示「Results: 0 cases」
-const showPanel  = searched;               // 0 筆保留右側結果面板的容器（不塞卡片）
-const showCards  = searched && count > 0;  // 只有有結果才顯示卡片
-const showBrowse = !showCards;             // 只要沒有卡片（含 0 筆）就顯示 Browse
+  // 想要 0 筆也顯示 Results 標題：head、panel 都跟著 searched 顯示
+  const showHead   = searched;               // 0 筆也顯示「Results: 0 cases」
+  const showPanel  = searched;               // 0 筆保留右側結果面板的容器（不塞卡片）
+  const showCards  = searched && count > 0;  // 只有有結果才顯示卡片
+  const showBrowse = !showCards;             // 只要沒有卡片（含 0 筆）就顯示 Browse
 
-// 更新數字
-if (typeof setResultsCount === 'function') {
-  setResultsCount(count);
-} else {
-  const counterEl = document.getElementById('counter') || document.querySelector('.counter');
-  if (counterEl) counterEl.textContent = `Results: ${count} ${count === 1 ? 'case' : 'cases'}`;
-}
-
-// 顯示/隱藏主要區塊（注意：head/panel 永遠跟 searched，同步；cards 依 count）
-window._toggleEl = window._toggleEl || function (selOrNode, on) {
-  const n = (typeof selOrNode === 'string') ? document.querySelector(selOrNode) : selOrNode;
-  if (!n) return; if (on) n.style.removeProperty('display'); else n.style.display = 'none';
-};
-window._toggleEl('.resultsHead', showHead);
-window._toggleEl('#resultsPanel', showPanel);
-window._toggleEl('#cards', showCards);
-window._toggleEl('#recBar', showBrowse);
-
-// Advanced 面板：多筆才顯示
-const filt = document.getElementById('filters');
-if (filt) {
-  const showFilter = showCards && count > 1;
-  filt.classList.toggle('show', showFilter);
-  window._toggleEl(filt, showFilter);
-}
-
-// 單筆視覺
-const mainEl  = document.querySelector('.main') || document.querySelector('.content') || document.querySelector('.twoCols');
-const panelEl = document.getElementById('resultsPanel');
-const cardsEl = document.getElementById('cards');
-
-if (showCards && count === 1) {
-  mainEl?.classList.add('singleResult');
-  panelEl?.classList.add('spanAll');
-  cardsEl?.classList.add('centerOne');
-} else {
-  mainEl?.classList.remove('singleResult');
-  panelEl?.classList.remove('spanAll');
-  cardsEl?.classList.remove('centerOne');
-}
-
-// 排序下拉（單筆時關閉；0 筆也關）
-const sortSel = document.getElementById('sortBy');
-if (sortSel) {
-  const wrap = sortSel.closest('.sortWrap') || sortSel;
-  if (count <= 1) {
-    wrap.style.display = 'none';
-    sortSel.disabled = true;
-    if (state.sort_by !== 'quality') state.sort_by = 'quality';
+  // 更新數字
+  if (typeof setResultsCount === 'function') {
+    setResultsCount(count);
   } else {
-    wrap.style.display = '';
-    sortSel.disabled = false;
+    const counterEl = document.getElementById('counter') || document.querySelector('.counter');
+    if (counterEl) counterEl.textContent = `Results: ${count} ${count === 1 ? 'case' : 'cases'}`;
   }
-}
+
+  // 顯示/隱藏主要區塊（注意：head/panel 永遠跟 searched，同步；cards 依 count）
+  window._toggleEl = window._toggleEl || function (selOrNode, on) {
+    const n = (typeof selOrNode === 'string') ? document.querySelector(selOrNode) : selOrNode;
+    if (!n) return; if (on) n.style.removeProperty('display'); else n.style.display = 'none';
+  };
+  window._toggleEl('.resultsHead', showHead);
+  window._toggleEl('#resultsPanel', showPanel);
+  window._toggleEl('#cards', showCards);
+  window._toggleEl('#recBar', showBrowse);
+
+  // Advanced 面板：多筆才顯示
+  const filt = document.getElementById('filters');
+  if (filt) {
+    const showFilter = showCards && count > 1;
+    filt.classList.toggle('show', showFilter);
+    window._toggleEl(filt, showFilter);
+  }
+
+  // 單筆視覺
+  const mainEl  = document.querySelector('.main') || document.querySelector('.content') || document.querySelector('.twoCols');
+  const panelEl = document.getElementById('resultsPanel');
+  const cardsEl = document.getElementById('cards');
+
+  if (showCards && count === 1) {
+    mainEl?.classList.add('singleResult');
+    panelEl?.classList.add('spanAll');
+    cardsEl?.classList.add('centerOne');
+  } else {
+    mainEl?.classList.remove('singleResult');
+    panelEl?.classList.remove('spanAll');
+    cardsEl?.classList.remove('centerOne');
+  }
+
+  // 排序下拉（單筆時關閉；0 筆也關）
+  const sortSel = document.getElementById('sortBy');
+  if (sortSel) {
+    const wrap = sortSel.closest('.sortWrap') || sortSel;
+    if (count <= 1) {
+      wrap.style.display = 'none';
+      sortSel.disabled = true;
+      if (state.sort_by !== 'quality') state.sort_by = 'quality';
+    } else {
+      wrap.style.display = '';
+      sortSel.disabled = false;
+    }
+  }
 }
 
 
 function wirePopSafe(root) {
-if (!root) return;
-const btn = root.querySelector('.popBtn');
-if (!btn) return;
+  if (!root) return;
+  const btn = root.querySelector('.popBtn');
+  if (!btn) return;
 
-btn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  root.classList.toggle('open');
-  $$('.pop.open').forEach(p => { if (p !== root) p.classList.remove('open'); });
-});
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    root.classList.toggle('open');
+    $$('.pop.open').forEach(p => { if (p !== root) p.classList.remove('open'); });
+  });
 
-root.querySelector('.popPanel')?.addEventListener('click', (e) => e.stopPropagation());
-document.addEventListener('click', (e) => { if (!root.contains(e.target)) root.classList.remove('open'); });
+  root.querySelector('.popPanel')?.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', (e) => { if (!root.contains(e.target)) root.classList.remove('open'); });
 }
 wirePopSafe(document.getElementById('popID'));
 wirePopSafe(document.getElementById('popSTA'));
 
 async function fetchJSON(u) {
-const r = await fetch(u, { cache: 'no-store' });
-if (!r.ok) throw new Error(await r.text());
-return r.json();
+  const r = await fetch(u, { cache: 'no-store' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
 
 /* quality helpers */
 function idNum(x) { const m = String(x.case_id || x['PanTS ID'] || x.id).match(/\d+/) || [0]; return Number(m[0]); }
 function isComplete(it) {
-const sexOK = it.sex === 'M' || it.sex === 'F';
-const ageOK = Number.isFinite(it.age) && it.age > 0;
-const tumorOK = it.tumor === 0 || it.tumor === 1;
-const spOK = Number.isFinite(it.spacing_sum) && it.spacing_sum > 0;
-const shOK = Number.isFinite(it.shape_sum) && it.shape_sum > 0;
-return sexOK && ageOK && tumorOK && spOK && shOK;
+  const sexOK = it.sex === 'M' || it.sex === 'F';
+  const ageOK = Number.isFinite(it.age) && it.age > 0;
+  const tumorOK = it.tumor === 0 || it.tumor === 1;
+  const spOK = Number.isFinite(it.spacing_sum) && it.spacing_sum > 0;
+  const shOK = Number.isFinite(it.shape_sum) && it.shape_sum > 0;
+  return sexOK && ageOK && tumorOK && spOK && shOK;
 }
+/* quality helpers（當前檔案已存在 isComplete, idNum 等） */
 function compareQuality(a, b) {
-const ca = isComplete(a), cb = isComplete(b);
-if (ca !== cb) return cb - ca;
-const s1 = (a.spacing_sum ?? 1e9) - (b.spacing_sum ?? 1e9);
-if (s1 !== 0) return s1;
-const s2 = (b.shape_sum ?? -1) - (a.shape_sum ?? -1);
-if (s2 !== 0) return s2;
-return idNum(a) - idNum(b);
+  // 1) 完整度優先（age/sex/tumor/spacing/shape 都有值）
+  const ca = isComplete(a), cb = isComplete(b);
+  if (ca !== cb) return cb - ca;
+
+  // 2) 以視野大小為主（shape_sum 越大越好）
+  const shA = a.shape_sum ?? -1, shB = b.shape_sum ?? -1;
+  if (shA !== shB) return shB - shA;
+
+  // 3) 解析度：spacing 總和越小越好（xyz pixel spacing 相加）
+  const spA = a.spacing_sum ?? 1e9, spB = b.spacing_sum ?? 1e9;
+  if (spA !== spB) return spA - spB;
+
+  // 4) 最後用 ID 讓排序穩定
+  return idNum(a) - idNum(b);
 }
 
 /* Browse */
 let recTimer = null, recPlaying = true;
 
 async function initBrowse() {
-try {
-  if (recTimer) { clearInterval(recTimer); recTimer = null; }
-  const bar = $('#recScroll');
-  if (!bar) return;
-  bar.innerHTML = '';
+  try {
+    if (recTimer) { clearInterval(recTimer); recTimer = null; }
+    const bar = $('#recScroll');
+    if (!bar) return;
+    bar.innerHTML = '';
 
-  let source = [];
-  const r = await fetchJSON(apiUrl + '/api/random?n=60&k=120&scope=all');
-  source = r.items || [];
-
-  const best = source.slice().sort(compareQuality).filter(isComplete).slice(0, 20);
-
-  if (!best.length) {
-    const empty = document.createElement('article');
-    empty.className = 'card inRec';
-    empty.innerHTML = `
-      <div class="body" style="padding:12px 14px">
-        <div class="titleRow"><span class="recId" style="font-weight:900">No items</span></div>
-        <div class="keyRow" style="margin-top:6px;color:#93a4b8">Try adjusting filters, then Search</div>
-      </div>`;
-    bar.appendChild(empty);
-    $('#recPrev')?.setAttribute('disabled', 'disabled');
-    $('#recNext')?.setAttribute('disabled', 'disabled');
-    $('#recPlay')?.setAttribute('disabled', 'disabled');
-    return;
-  } else {
-    $('#recPrev')?.removeAttribute('disabled');
-    $('#recNext')?.removeAttribute('disabled');
-    $('#recPlay')?.removeAttribute('disabled');
-  }
-
-  const frag = document.createDocumentFragment();
-  for (const it of best) {
-    const card = await makeCard(it);
-    card.classList.add('inRec');
-    frag.appendChild(card);
-  }
-  bar.appendChild(frag);
-
-  const vp = document.querySelector('.recViewport');
-  const firstCard = bar.querySelector('.card') || bar.querySelector('.recCard');
-  if (vp && firstCard) {
-    const h = Math.ceil(firstCard.getBoundingClientRect().height);
-    vp.style.minHeight = h + 'px';
-  }
-
-  const scroller = bar;
-  const gap = 12;
-  let step = firstCard ? (firstCard.getBoundingClientRect().width + gap) : 340;
-
-  const atEnd = () =>
-    (scroller.scrollLeft + scroller.clientWidth) >= (scroller.scrollWidth - 2);
-
-  const tick = () => {
-    if (atEnd()) scroller.scrollTo({ left: 0, behavior: 'smooth' });
-    else scroller.scrollBy({ left: step, behavior: 'smooth' });
-  };
-
-  $('#recPrev').onclick = (e) => { e?.preventDefault?.(); e?.stopPropagation?.(); scroller.scrollBy({ left: -step, behavior: 'smooth' }); };
-  $('#recNext').onclick = (e) => { e?.preventDefault?.(); e?.stopPropagation?.(); scroller.scrollBy({ left: +step, behavior: 'smooth' }); };
-  $('#recPlay').onclick = (e) => {
-    e?.preventDefault?.(); e?.stopPropagation?.();
-    recPlaying = !recPlaying;
-    $('#recPlay').textContent = recPlaying ? '⏸' : '▶';
-    if (recPlaying) startAuto(); else stopAuto();
-  };
-// 7984 3378 3328
-  function startAuto() { stopAuto(); recTimer = setInterval(tick, 5200); }
-  function stopAuto() { if (recTimer) { clearInterval(recTimer); recTimer = null; } }
-
-  $('#recPlay').textContent = recPlaying ? '⏸' : '▶';
-  if (recPlaying) startAuto();
-
-  if (window._recResizeHandler) {
-    window.removeEventListener('resize', window._recResizeHandler);
-  }
-  window._recResizeHandler = () => {
-    const first = bar.querySelector('.card') || bar.querySelector('.recCard');
-    step = first ? (first.getBoundingClientRect().width + gap) : 340;
-  };
-  window.addEventListener('resize', window._recResizeHandler, { passive: true });
-
-  ['recPrev', 'recNext', 'recPlay'].forEach((id) => {
-    const btn = document.getElementById(id);
-    if (!btn) return;
-    btn.tabIndex = 0;
-    if (!btn.getAttribute('aria-label')) {
-      btn.setAttribute('aria-label', id === 'recPrev' ? 'Previous' : id === 'recNext' ? 'Next' : 'Pause/Play');
+    let source = [];
+    if (ALL_ITEMS && ALL_ITEMS.length) {
+      source = ALL_ITEMS;
+    } else {
+      const r = await fetchJSON('/api/random?n=120&k=240&scope=filtered');
+      source = r.items || [];
     }
-    btn.addEventListener('mousedown', (e) => e.preventDefault());
-    btn.addEventListener('keydown', (e) => {
-      const k = e.key;
-      const shouldClick =
-        k === 'Enter' ||
-        k === ' ' ||
-        (id === 'recPrev' && k === 'ArrowLeft') ||
-        (id === 'recNext' && k === 'ArrowRight') ||
-        (id === 'recPlay' && (k === 'k' || k === 'K'));
-      if (shouldClick) { e.preventDefault(); e.stopPropagation(); btn.click(); }
+
+    // ====== 常數 ======
+    const MIN_SHAPE_SUM    = 750;
+    const MAX_SPACING_SUM  = 6.0;
+    const MIN_Z            = 220;
+    const MAX_Z_SPACING    = 1.2;
+    const MIN_XY_MIN       = 360;
+
+    const POS_HINTS = ['chest','thorax','abdomen','abdo','pelvis','cap','tap','soft','venous','portal','contrast'];
+    const NEG_HINTS = ['spine','cervical','thoracic','lumbar','vertebra','scolio','bone','bony','osseous','orthopedic','skeletal','mip','recon','localizer','scout'];
+
+    // ⛔ 明確排除名單
+    const BAD_IDS = ['PanTS_00006171', 'PanTS_00009810', 'PanTS_00009809'];
+
+    // ---- helpers ----
+    const idOf = (it) => String(it?.id || it?.case_id || it?.name || it?.['PanTS ID'] || '');
+    const toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+    const parseTriplet = (raw) => {
+      if (!raw) return null;
+      if (Array.isArray(raw) && raw.length >= 3) {
+        const a = [toNum(raw[0]), toNum(raw[1]), toNum(raw[2])];
+        return a.every(x=>x!==null) ? a : null;
+      }
+      const s = String(raw).trim();
+      if (!s) return null;
+      const parts = s.replace(/[\[\]\(\)\{\}]/g,' ')
+                     .replace(/[xX,;|]/g,' ')
+                     .split(/\s+/).filter(Boolean).map(Number);
+      if (parts.length >= 3 && parts.slice(0,3).every(Number.isFinite)) return parts.slice(0,3);
+      return null;
+    };
+    const shapeXYZ   = (it) => parseTriplet(it.shape ?? it.shape_str ?? it.shapeXYZ);
+    const spacingXYZ = (it) => parseTriplet(it.spacing ?? it.spacing_str ?? it.spacingXYZ);
+
+    // 偏好（主過濾）
+    const prefer = (it) => {
+      if (!isComplete(it)) return false;
+      if (BAD_IDS.includes(idOf(it))) return false; // ⛔ 直接擋
+
+      const st = String(it.study_type || '').toLowerCase();
+      if (NEG_HINTS.some(k => st.includes(k))) return false;
+
+      const shp = shapeXYZ(it), spc = spacingXYZ(it);
+      if (!shp || !spc) return false;
+
+      const [sx, sy, sz]    = shp;
+      const [spx, spy, spz] = spc;
+      if (![sx,sy,sz,spx,spy,spz].every(Number.isFinite)) return false;
+
+      const xyOK      = Math.min(sx, sy) >= MIN_XY_MIN;
+      const zOK       = sz >= MIN_Z;
+      const zSpOK     = spz <= MAX_Z_SPACING;
+
+      const shapeOK   = (it.shape_sum   ?? (sx+sy+sz))   >= MIN_SHAPE_SUM;
+      const spacingOK = (it.spacing_sum ?? (spx+spy+spz)) <= MAX_SPACING_SUM;
+
+      return xyOK && zOK && zSpOK && shapeOK && spacingOK;
+    };
+
+    // 排序
+    const scorePos = (it) => {
+      const st = String(it.study_type || '').toLowerCase();
+      return POS_HINTS.reduce((s, k) => s + (st.includes(k) ? 1 : 0), 0);
+    };
+    const byCuratedQuality = (a, b) => {
+      const [ , , za] = shapeXYZ(a) || [null,null,null];
+      const [ , , zb] = shapeXYZ(b) || [null,null,null];
+      const [ , , zsa]= spacingXYZ(a) || [null,null,null];
+      const [ , , zsb]= spacingXYZ(b) || [null,null,null];
+
+      if (zsa !== zsb) return (zsa ?? 1e9) - (zsb ?? 1e9);   // spacingZ 小優先
+      if (za  !== zb ) return (zb  ?? -1) - (za  ?? -1);     // shapeZ 大其次
+
+      const shA = (a.shape_sum ?? ((shapeXYZ(a)||[0,0,0]).reduce((p,c)=>p+c,0)));
+      const shB = (b.shape_sum ?? ((shapeXYZ(b)||[0,0,0]).reduce((p,c)=>p+c,0)));
+      if (shA !== shB) return shB - shA;
+
+      const spA = (a.spacing_sum ?? ((spacingXYZ(a)||[1e9,1e9,1e9]).reduce((p,c)=>p+c,0)));
+      const spB = (b.spacing_sum ?? ((spacingXYZ(b)||[1e9,1e9,1e9]).reduce((p,c)=>p+c,0)));
+      if (spA !== spB) return spA - spB;
+
+      const sA = scorePos(a), sB = scorePos(b);
+      if (sA !== sB) return sB - sA;
+
+      return idNum(a) - idNum(b);
+    };
+
+    // 嚴格過濾；不足則 fallback（仍排除 BAD_IDS）
+    const filtered = source.filter(prefer);
+    const fallback = () => {
+      const loose = source.filter(it => {
+        if (!isComplete(it)) return false;
+        if (BAD_IDS.includes(idOf(it))) return false; // ⛔ 仍擋
+        const st = String(it.study_type || '').toLowerCase();
+        if (NEG_HINTS.some(k => st.includes(k))) return false;
+
+        const shp = shapeXYZ(it), spc = spacingXYZ(it);
+        if (!shp || !spc) return false;
+        const [sx, sy, sz] = shp;
+        const [ , , spz ]  = spc;
+
+        const xyOK  = Math.min(sx, sy) >= (MIN_XY_MIN - 20);
+        const zOK   = sz >= (MIN_Z - 20);
+        const zSpOK = spz <= (MAX_Z_SPACING + 0.3);
+
+        const shapeOK   = (it.shape_sum ?? (sx+sy+sz)) >= (MIN_SHAPE_SUM - 80);
+        const spacingOK = (it.spacing_sum ?? (spc[0]+spc[1]+spc[2])) <= (MAX_SPACING_SUM + 1.0);
+
+        return xyOK && zOK && zSpOK && shapeOK && spacingOK;
+      });
+      return loose.length ? loose : source.filter(it => isComplete(it) && !BAD_IDS.includes(idOf(it)));
+    };
+
+    const ranked = (filtered.length ? filtered : fallback()).sort(byCuratedQuality);
+
+    // 最後再保險一次：把 BAD_IDS 剔除
+    const best = ranked.filter(it => !BAD_IDS.includes(idOf(it))).slice(0, 20);
+
+    if (!best.length) {
+      const empty = document.createElement('article');
+      empty.className = 'card inRec';
+      empty.innerHTML = `
+        <div class="body" style="padding:12px 14px">
+          <div class="titleRow"><span class="recId" style="font-weight:900">No items</span></div>
+          <div class="keyRow" style="margin-top:6px;color:#93a4b8">Try adjusting filters, then Search</div>
+        </div>`;
+      bar.appendChild(empty);
+      $('#recPrev')?.setAttribute('disabled', 'disabled');
+      $('#recNext')?.setAttribute('disabled', 'disabled');
+      $('#recPlay')?.setAttribute('disabled', 'disabled');
+      return;
+    } else {
+      $('#recPrev')?.removeAttribute('disabled');
+      $('#recNext')?.removeAttribute('disabled');
+      $('#recPlay')?.removeAttribute('disabled');
+    }
+
+    const frag = document.createDocumentFragment();
+    best.forEach(it => { const card = makeCard(it); card.classList.add('inRec'); frag.appendChild(card); });
+    bar.appendChild(frag);
+
+    const vp = document.querySelector('.recViewport');
+    const firstCard = bar.querySelector('.card') || bar.querySelector('.recCard');
+    if (vp && firstCard) {
+      const h = Math.ceil(firstCard.getBoundingClientRect().height);
+      vp.style.minHeight = h + 'px';
+    }
+
+    const scroller = bar;
+    const gap = 12;
+    let step = firstCard ? (firstCard.getBoundingClientRect().width + gap) : 340;
+
+    const atEnd = () => (scroller.scrollLeft + scroller.clientWidth) >= (scroller.scrollWidth - 2);
+    const tick = () => { if (atEnd()) scroller.scrollTo({ left: 0, behavior: 'smooth' }); else scroller.scrollBy({ left: step, behavior: 'smooth' }); };
+
+    $('#recPrev').onclick = (e) => { e?.preventDefault?.(); e?.stopPropagation?.(); scroller.scrollBy({ left: -step, behavior: 'smooth' }); };
+    $('#recNext').onclick = (e) => { e?.preventDefault?.(); e?.stopPropagation?.(); scroller.scrollBy({ left: +step, behavior: 'smooth' }); };
+    $('#recPlay').onclick = (e) => {
+      e?.preventDefault?.(); e?.stopPropagation?.();
+      recPlaying = !recPlaying;
+      $('#recPlay').textContent = recPlaying ? '⏸' : '▶';
+      if (recPlaying) startAuto(); else stopAuto();
+    };
+
+    function startAuto() { stopAuto(); recTimer = setInterval(tick, 3500); }
+    function stopAuto()  { if (recTimer) { clearInterval(recTimer); recTimer = null; } }
+
+    $('#recPlay').textContent = recPlaying ? '⏸' : '▶';
+    if (recPlaying) startAuto();
+
+    if (window._recResizeHandler) window.removeEventListener('resize', window._recResizeHandler);
+    window._recResizeHandler = () => {
+      const first = bar.querySelector('.card') || bar.querySelector('.recCard');
+      step = first ? (first.getBoundingClientRect().width + gap) : 340;
+    };
+    window.addEventListener('resize', window._recResizeHandler, { passive: true });
+
+    ['recPrev','recNext','recPlay'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.tabIndex = 0;
+      if (!btn.getAttribute('aria-label')) {
+        btn.setAttribute('aria-label', id === 'recPrev' ? 'Previous' : id === 'recNext' ? 'Next' : 'Pause/Play');
+      }
+      btn.addEventListener('mousedown', (e) => e.preventDefault());
+      btn.addEventListener('keydown', (e) => {
+        const k = e.key;
+        const shouldClick =
+          k === 'Enter' || k === ' ' ||
+          (id === 'recPrev' && k === 'ArrowLeft') ||
+          (id === 'recNext' && k === 'ArrowRight') ||
+          (id === 'recPlay' && (k === 'k' || k === 'K'));
+        if (shouldClick) { e.preventDefault(); e.stopPropagation(); btn.click(); }
+      });
     });
-  });
-} catch (e) {
-  console.warn('initBrowse failed:', e);
-}
+  } catch (e) {
+    console.warn('initBrowse failed:', e);
+  }
 }
 
+
+
+
+const FACET_PAIRS = [
+  ['ct_phase_opts', 'ct_phase'],
+  ['manufacturer_opts', 'manufacturer'],
+  ['model_opts', 'model'],
+  ['type_opts', 'study_type'],
+  ['nat_opts', 'site_nat'],
+  ['year_opts', 'year'],
+];
 /* Lists / facets */
 const SPLIT_RE = /[;,|/、，·・]+/;
 const NAT_MAP = { 'USA': 'US', 'U.S.': 'US', 'U S A': 'US', 'GB': 'UK', 'U.K.': 'UK', 'N/A': 'NA', 'NULL': 'NA' };
@@ -2062,221 +2591,217 @@ const pickField = (obj, cands) => { for (const k of cands) { if (Object.prototyp
 
 /* --- 建立清單（初次） --- */
 function buildFacetList(container, key, rows, hasLabel = false){
-const box = document.getElementById(container);
-if (!box) return;
-box.innerHTML = '';
+  const box = document.getElementById(container);
+  if (!box) return;
+  box.innerHTML = '';
 
-const validRows = (rows || [])
-  .filter(r => (r.count ?? 0) > 0)
-  .sort((a,b) => (b.count??0)-(a.count??0));
+  const validRows = (rows || [])
+    .filter(r => (r.count ?? 0) > 0)
+    .sort((a,b) => (b.count??0)-(a.count??0));
 
-validRows.forEach(r => {
-  const text = hasLabel ? (r.label || r.value) : r.value;
-  const d = document.createElement('div');
-  d.className = 'optRow';
-  d.dataset.k = key;
-  d.dataset.v = String(r.value);
-  d.innerHTML = `<label><input type="checkbox" data-k="${key}" value="${r.value}"> <span class="lbl">${text}</span></label> <span class="count">${r.count ?? 0}</span>`;
+  validRows.forEach(r => {
+    const text = hasLabel ? (r.label || r.value) : r.value;
+    const d = document.createElement('div');
+    d.className = 'optRow';
+    d.dataset.k = key;
+    d.dataset.v = String(r.value);
+    d.innerHTML = `<label><input type="checkbox" data-k="${key}" value="${r.value}"> <span class="lbl">${text}</span></label> <span class="count">${r.count ?? 0}</span>`;
 
-  box.appendChild(d);
-});
+    box.appendChild(d);
+  });
 
-const fset = box.closest('.fset');
-if (fset) fset.style.display = box.children.length ? '' : 'none';
+  const fset = box.closest('.fset');
+  if (fset) fset.style.display = box.children.length ? '' : 'none';
 }
 
 /* --- Show more / less --- */
 function wireShowMore(){
-document.querySelectorAll('.showMore').forEach(btn=>{
-  const targetId = btn.dataset.target;
-  const limit = parseInt(btn.dataset.limit || '12', 10);
-  const box = document.getElementById(targetId);
-  if (!box) return;
+  document.querySelectorAll('.showMore').forEach(btn=>{
+    const targetId = btn.dataset.target;
+    const limit = parseInt(btn.dataset.limit || '12', 10);
+    const box = document.getElementById(targetId);
+    if (!box) return;
 
-  const apply = () => {
-    const rows = Array.from(box.querySelectorAll('.optRow'))
-      .filter(r => r.dataset.hiddenByCount !== '1'); // 被 count=0 隱藏的不列入分頁
-    const expanded = box.classList.contains('expanded');
-    rows.forEach((row, idx) => row.style.display = (expanded || idx < limit) ? 'flex' : 'none');
-    btn.style.display = (rows.length > limit) ? '' : 'none';
-    btn.textContent = expanded ? 'Show less' : 'Show more';
+    const apply = () => {
+      const rows = Array.from(box.querySelectorAll('.optRow'))
+        .filter(r => r.dataset.hiddenByCount !== '1'); // 被 count=0 隱藏的不列入分頁
+      const expanded = box.classList.contains('expanded');
+      rows.forEach((row, idx) => row.style.display = (expanded || idx < limit) ? 'flex' : 'none');
+      btn.style.display = (rows.length > limit) ? '' : 'none';
+      btn.textContent = expanded ? 'Show less' : 'Show more';
+    };
+
+    btn.addEventListener('click', () => { box.classList.toggle('expanded'); apply(); });
+    box._applyPager = apply;  // 提供外部（更新數字後）重算
+    apply();
+  });
+}
+
+function updateFacetCounts(countPayload = {}) {
+  FACET_PAIRS.forEach(([containerId, key]) => {
+    const box = document.getElementById(containerId);
+    if (!box) return;
+
+    const rows  = Array.from(box.querySelectorAll('.optRow'));
+    const mp    = Object.create(null);
+    (countPayload[key] || []).forEach(r => { mp[String(r.value)] = r.count || 0; });
+
+    rows.forEach(row => {
+      const input = row.querySelector('input[type=checkbox]');
+      const val   = row.dataset.v || (input ? input.value : '');
+      const cnt   = (val in mp) ? mp[val] : 0;
+
+      // 更新數字
+      const badge = row.querySelector('.count');
+      if (badge) badge.textContent = cnt;
+
+      // 規則：count=0 時若尚未勾選 → disabled；已勾選則保持可用
+      const checked = !!(input && input.checked);
+      if (input) {
+        input.disabled = (!checked && cnt === 0);
+        row.classList.toggle('disabled', input.disabled);
+      }
+
+      // 不隱藏，全部保留顯示（若你想隱藏 0，可以把下一行改成 row.style.display = (checked || cnt>0) ? 'flex' : 'none';
+      row.style.display = (checked || cnt > 0) ? 'flex' : 'none';
+row.dataset.hiddenByCount = (checked || cnt > 0) ? '0' : '1';
+    });
+
+    // 小計：整組是否全為 0 且無勾選？若是，也保留顯示（不折疊），便於使用者理解為「目前條件下無資料」
+    const fset = box.closest('.fset');
+    if (fset) fset.style.display = rows.length ? '' : 'none';
+
+    // 讓「Show more/less」在更新後重算一次可見列數
+    box._applyPager?.();
+  });
+}
+
+/* --- 收集 Advanced 勾選 → state（Any 與其他互斥） --- */
+function collectAdvanced() {
+  const pickVals = k =>
+    Array.from(document.querySelectorAll(`#filters input[type=checkbox][data-k="${k}"]:checked`))
+      .map(i => String(i.value)).filter(v => v !== '');
+
+  // 同一組內處理「Any」互斥
+  const enforceAny = (k) => {
+    const list = Array.from(document.querySelectorAll(`#filters input[type=checkbox][data-k="${k}"]`));
+    const any  = list.find(x => x.value === '');
+    const restChecked = list.some(x => x.value !== '' && x.checked);
+    if (any) any.checked = !restChecked;
   };
 
-  btn.addEventListener('click', () => { box.classList.toggle('expanded'); apply(); });
-  box._applyPager = apply;  // 提供外部（更新數字後）重算
-  apply();
-});
-}
+  ['ct_phase','manufacturer','model','study_type','site_nat','year'].forEach(enforceAny);
 
-/* --- 只更新數字；第一次之後固定（凍結） --- */
-function updateFacetCounts(countPayload = {}){
-const pairs = [
-  ['ct_phase_opts', 'ct_phase'],
-  ['manufacturer_opts', 'manufacturer'],
-  ['model_opts', 'model'],
-  ['type_opts', 'study_type'],
-  ['nat_opts', 'site_nat'],
-  ['year_opts', 'year']
-];
-pairs.forEach(([containerId, key]) => {
-  const box = document.getElementById(containerId);
-  if (!box) return;
+  state.ct_phase     = pickVals('ct_phase');
+  state.manufacturer = pickVals('manufacturer');
+  state.model        = pickVals('model');
+  state.study_type   = pickVals('study_type');
+  state.site_nat     = pickVals('site_nat');
+  state.year         = pickVals('year');
 
-  const rows = Array.from(box.querySelectorAll('.optRow'));
-  const mp = Object.create(null);
-  (countPayload[key] || []).forEach(r => { mp[String(r.value)] = r.count || 0; });
+  updateSTASummary?.();
 
-  let visibleByCount = 0;
-  rows.forEach(row => {
-    const input = row.querySelector('input');
-    const val = row.dataset.v || (input ? input.value : '');
-    const c = (val in mp) ? mp[val] : 0;
-    const badge = row.querySelector('.count');
-    if (badge) badge.textContent = c;
-
-    const keepBecauseChecked = !!(input && input.checked);
-    const shouldShow = (c > 0) || keepBecauseChecked;
-
-    row.dataset.hiddenByCount = shouldShow ? '0' : '1';
-    row.style.display = shouldShow ? 'flex' : 'none';
-    if (shouldShow) visibleByCount++;
-  });
-
-  const fset = box.closest('.fset');
-  if (fset) fset.style.display = visibleByCount ? '' : 'none';
-});
-
-// 更新數字後，讓每一組重新計算 Show more/less
-;['ct_phase_opts','manufacturer_opts','model_opts','type_opts','nat_opts','year_opts']
-  .forEach(id => document.getElementById(id)?._applyPager?.());
-}
-
-/* --- 收集 Advanced 勾選 → state --- */
-function collectAdvanced() {
-const pickVals = k => Array.from(document.querySelectorAll(`#filters input[type=checkbox][data-k="${k}"]:checked`))
-  .map(i => String(i.value)).filter(v => v !== '');
-state.ct_phase     = pickVals('ct_phase');
-state.manufacturer = pickVals('manufacturer');
-state.model        = pickVals('model');
-state.study_type   = pickVals('study_type');
-state.site_nat     = pickVals('site_nat');
-state.year         = pickVals('year');
-updateSTASummary?.();
+  // 勾選變動後：即時計算 facet（依當前全部條件），並在已搜尋下觸發結果刷新
+  refreshFacetsDebounced(0);
+window.HAS_SEARCHED = true;  // 第一次按 advanced 也當作已搜尋
+run();
 }
 
 /* --- 把 state 轉成查詢字串（facets / search 共用） --- */
 function qsFromState() {
-const p = new URLSearchParams();
+  const p = new URLSearchParams();
 
-if (state.q) p.set('caseid', state.q);
+  if (state.q) p.set('caseid', state.q);
 
-if (Array.isArray(state.sex) && state.sex.length) {
-  state.sex.forEach(v => p.append('sex[]', v));
-}
-if (state.tumor !== '') p.set('tumor', state.tumor);
+  if (Array.isArray(state.sex) && state.sex.length) state.sex.forEach(v => p.append('sex[]', v));
+  if (state.tumor !== '') p.set('tumor', state.tumor);
 
-if (Array.isArray(state.age_bin) && state.age_bin.length) {
-  state.age_bin.forEach(v => p.append('age_bin[]', v));
-} else {
-  if (state.age_from) p.set('age_from', state.age_from);
-  if (state.age_to)   p.set('age_to',   state.age_to);
-}
-
-['ct_phase', 'manufacturer', 'model', 'study_type', 'site_nat', 'year']
-  .forEach(k => (state[k] || []).forEach(v => p.append(k + '[]', v)));
-
-if (state.sort_by)  p.set('sort_by',  state.sort_by);
-if (state.page)     p.set('page',     state.page);
-if (state.per_page) p.set('per_page', state.per_page);
-
-return p.toString();
-}
-
-/* === Facet counts：只取一次，之後凍結 === */
-let FROZEN_FACETS = null;
-
-async function refreshFacets() {
-try {
-  if (FROZEN_FACETS) {         // 已凍結 → 只用舊數字重繪
-    updateFacetCounts(FROZEN_FACETS);
-    return;
+  if (Array.isArray(state.age_bin) && state.age_bin.length) {
+    state.age_bin.forEach(v => p.append('age_bin[]', v));
+  } else {
+    if (state.age_from) p.set('age_from', state.age_from);
+    if (state.age_to)   p.set('age_to',   state.age_to);
   }
-  const qs  = qsFromState();   // 第一次取數字
-  const url = apiUrl + '/api/facets?fields=ct_phase,manufacturer,model,study_type,site_nat,year&top_k=999&guarantee=0&' + qs;
-  const f   = await fetchJSON(url);
-  FROZEN_FACETS = f?.facets || {};
-  updateFacetCounts(FROZEN_FACETS);
-} catch (err) {
-  console.warn('refreshFacets failed:', err);
+
+  ['ct_phase', 'manufacturer', 'model', 'study_type', 'site_nat', 'year']
+    .forEach(k => (state[k] || []).forEach(v => p.append(k + '[]', v)));
+
+  if (state.sort_by)  p.set('sort_by',  state.sort_by);
+  if (state.page)     p.set('page',     state.page);
+  if (state.per_page) p.set('per_page', state.per_page);
+
+  return p.toString();
 }
-}
+
+
 
 /* === 一次性初始化：建立 Advanced 清單、綁定事件 === */
 (async function primeUI() {
-// 第一次先取（有 guarantee=1），用來建出清單
-let f0 = { facets: {} };
-try {
-  f0 = await fetchJSON(apiUrl + '/api/facets?fields=ct_phase,manufacturer,model,study_type,site_nat,year&top_k=999&guarantee=1');
-} catch (e) {
-  console.warn('facets fetch failed:', e);
-}
-const fx = f0?.facets || {};
+  // 1) 先拉全集 facets（guarantee=1）來「建清單」
+  let f0 = { facets: {} };
+  try {
+    f0 = await fetchJSON('/api/facets?fields=ct_phase,manufacturer,model,study_type,site_nat,year&top_k=999&guarantee=1');
+  } catch (e) {
+    console.warn('facets fetch failed:', e);
+  }
+  const fx = f0?.facets || {};
 
-// 建 facet 清單
-try {
-  if (document.getElementById('ct_phase_opts')) buildFacetList('ct_phase_opts', 'ct_phase', fx.ct_phase || []);
-  if (document.getElementById('manufacturer_opts')) buildFacetList('manufacturer_opts', 'manufacturer', fx.manufacturer || []);
-  if (document.getElementById('model_opts')) buildFacetList('model_opts', 'model',
-    (fx.model || []).map(r => ({ value: r.value, label: r.label ?? r.value, count: r.count })), true);
-  if (document.getElementById('type_opts')) buildFacetList('type_opts', 'study_type', fx.study_type || []);
-  if (document.getElementById('nat_opts')) buildFacetList('nat_opts', 'site_nat',
-    (fx.site_nat || []).map(r => ({ value: r.value, label: r.label ?? r.value, count: r.count })), true);
-  if (document.getElementById('year_opts')) buildFacetList('year_opts', 'year',
-    (fx.year || []).map(r => ({ value: String(r.value), count: r.count })));
-} catch (e) {
-  console.warn('build facet list failed:', e);
-}
+  // 2) 依 fx 建出各組清單（只做一次）
+  try {
+    if (document.getElementById('ct_phase_opts')) buildFacetList('ct_phase_opts', 'ct_phase', fx.ct_phase || []);
+    if (document.getElementById('manufacturer_opts')) buildFacetList('manufacturer_opts', 'manufacturer', fx.manufacturer || []);
+    if (document.getElementById('model_opts')) buildFacetList('model_opts', 'model',
+      (fx.model || []).map(r => ({ value: r.value, label: r.label ?? r.value, count: r.count })), true);
+    if (document.getElementById('type_opts')) buildFacetList('type_opts', 'study_type', fx.study_type || []);
+    if (document.getElementById('nat_opts')) buildFacetList('nat_opts', 'site_nat',
+      (fx.site_nat || []).map(r => ({ value: r.value, label: r.label ?? r.value, count: r.count })), true);
+    if (document.getElementById('year_opts')) buildFacetList('year_opts', 'year',
+      (fx.year || []).map(r => ({ value: String(r.value), count: r.count })));
+  } catch (e) {
+    console.warn('build facet list failed:', e);
+  }
 
-// 裝上 Show more/less
-wireShowMore();
+  // 3) Show more/less 分頁器掛上
+  wireShowMore?.();
 
-// 第一次的數字先補上（之後就凍結）
-if (!FROZEN_FACETS) FROZEN_FACETS = fx;
-updateFacetCounts(FROZEN_FACETS);
+  // 4) 先把「全集」的數字畫上（頁面初始狀態）
+  updateFacetCounts(fx);
 
-// 監聽 Advanced 勾選
-const filtersEl = document.getElementById('filters');
-if (filtersEl) {
-  filtersEl.addEventListener('change', async e => {
-    const cb = e.target?.closest?.('input[type=checkbox]');
-    if (!cb) return;
-    const key = cb.dataset.k;
-    const isAny = (cb.value === '');
-    if (isAny) {
-      document.querySelectorAll(`#filters input[type=checkbox][data-k="${key}"]`).forEach(x => x.checked = (x === cb));
-    } else {
-      const any = document.querySelector(`#filters input[type=checkbox][data-k="${key}"][value=""]`);
-      if (any) any.checked = false;
-    }
-    collectAdvanced();
-    await refreshFacets();   // 這裡只會重繪凍結的數字
-    if (HAS_SEARCHED) run();
-  });
-}
+  // 5) 綁 Advanced 勾選事件（「Any」互斥 + live counts + 若已搜尋則刷新結果）
+  const filtersEl = document.getElementById('filters');
+  if (filtersEl) {
+    filtersEl.addEventListener('change', e => {
+      const cb = e.target?.closest?.('input[type=checkbox][data-k]');
+      if (!cb) return;
+
+      const key   = cb.dataset.k;
+      const isAny = (cb.value === '');
+
+      // 「Any」與其他互斥
+      if (isAny) {
+        document.querySelectorAll(`#filters input[type=checkbox][data-k="${key}"]`)
+          .forEach(x => x.checked = (x === cb));
+      } else {
+        const any = document.querySelector(`#filters input[type=checkbox][data-k="${key}"][value=""]`);
+        if (any) any.checked = false;
+      }
+
+      collectAdvanced(); // 內部會 debounced 觸發 refreshFacets()，並在 HAS_SEARCHED 時 run()
+    });
+  }
 })();
-
 /* Recent helpers（唯一版本） */
 function saveRecent(id) {
-try {
-  const key = 'recentIds';
-  const cur = JSON.parse(localStorage.getItem(key) || '[]');
-  const idStr = String(id || '').trim();
-  if (!idStr) return;
-  const next = [idStr, ...cur.filter(x => x !== idStr)].slice(0, 12);
-  localStorage.setItem(key, JSON.stringify(next));
-} catch (e) {
-  console.warn('saveRecent failed', e);
-}
+  try {
+    const key = 'recentIds';
+    const cur = JSON.parse(localStorage.getItem(key) || '[]');
+    const idStr = String(id || '').trim();
+    if (!idStr) return;
+    const next = [idStr, ...cur.filter(x => x !== idStr)].slice(0, 12);
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch (e) {
+    console.warn('saveRecent failed', e);
+  }
 }
 
 /* Results render */
@@ -2286,172 +2811,170 @@ const BATCH = 60;
 let current = [];
 
 function sorter(items) {
-const s = state.sort_by || 'quality';
-if (s === 'spacing_asc') return items.slice().sort((a, b) => (a.spacing_sum ?? 1e9) - (b.spacing_sum ?? 1e9));
-if (s === 'shape_desc') return items.slice().sort((a, b) => (b.shape_sum ?? -1) - (a.shape_sum ?? -1));
-if (s === 'age_asc')    return items.slice().sort((a, b) => (a.age ?? 1e9) - (b.age ?? 1e9));
-if (s === 'age_desc')   return items.slice().sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
-if (s === 'id_asc')     return items.slice().sort((a, b) => idNum(a) - idNum(b));
-if (s === 'id_desc')    return items.slice().sort((a, b) => idNum(b) - idNum(a));
-return items.slice().sort(compareQuality);
+  const s = state.sort_by || 'quality';
+  if (s === 'spacing_asc') return items.slice().sort((a, b) => (a.spacing_sum ?? 1e9) - (b.spacing_sum ?? 1e9));
+  if (s === 'shape_desc') return items.slice().sort((a, b) => (b.shape_sum ?? -1) - (a.shape_sum ?? -1));
+  if (s === 'age_asc')    return items.slice().sort((a, b) => (a.age ?? 1e9) - (b.age ?? 1e9));
+  if (s === 'age_desc')   return items.slice().sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
+  if (s === 'id_asc')     return items.slice().sort((a, b) => idNum(a) - idNum(b));
+  if (s === 'id_desc')    return items.slice().sort((a, b) => idNum(b) - idNum(a));
+  return items.slice().sort(compareQuality);
 }
 
 /* 控制排序下拉的顯示/隱藏（只有 1 筆或 0 筆就藏起來） */
 function updateSortVisibility() {
-const sel = document.getElementById('sortBy');
-if (!sel) return;
+  const sel = document.getElementById('sortBy');
+  if (!sel) return;
 
-const wrap = sel.closest('.sortWrap') || sel;
-const count = Array.isArray(lastFetched) ? lastFetched.length : 0;
-const enable = count > 1;
+  const wrap = sel.closest('.sortWrap') || sel;
+  const count = Array.isArray(lastFetched) ? lastFetched.length : 0;
+  const enable = count > 1;
 
-if (!enable) {
-  wrap.style.display = 'none';
-  sel.disabled = true;
-  // 回到預設排序，避免顯示誤導
-  if (state.sort_by !== 'quality') state.sort_by = 'quality';
-  if (sel.value !== 'quality') sel.value = 'quality';
-} else {
-  wrap.style.display = '';
-  sel.disabled = false;
-}
-}
-
-
-async function makeCard(it) {
-const id = String(it.case_id || it['PanTS ID'] || it.id || '');
-const sex = it.sex || '—';
-const age = Number.isFinite(it.age) ? `${it.age}y` : '—';
-const tumor = (it.tumor === 1 ? 'Tumor' : (it.tumor === 0 ? 'No tumor' : '—'));
-
-const thumbURL = (typeof profileURL === 'function' && typeof idNum === 'function')
-  ? await profileURL(idNum(it))
-  : null;
-
-const wrap = document.createElement('article');
-wrap.className = 'card';
-wrap.innerHTML = `
-  <img class="thumb" src="${thumbURL || svg('2D Image')}"
-        onerror="this.src='${svg('2D Image')}'" alt="">
-  <div class="body">
-    <div class="titleRow">
-      <a href="javascript:void(0)" class="caseLink" data-id="${id}">
-        ${id.replace(/^Case\\s*/, '')}
-      </a>
-    </div>
-    <div class="keyRow">
-      <span class="kv"><span class="k">Sex</span><span class="v">${sex}</span></span>
-      <span class="kv"><span class="k">Age</span><span class="v">${age}</span></span>
-      <span class="kv"><span class="tag ${tumor === 'No tumor' ? 'ok' : 'bad'}">${tumor}</span></span>
-    </div>
-  </div>`;
-
-const open = () => { saveRecent(id); openViewer(id); };
-wrap.querySelector('.caseLink')?.addEventListener('click', open);
-wrap.querySelector('.thumb')?.addEventListener('click', open);
-return wrap;
+  if (!enable) {
+    wrap.style.display = 'none';
+    sel.disabled = true;
+    // 回到預設排序，避免顯示誤導
+    if (state.sort_by !== 'quality') state.sort_by = 'quality';
+    if (sel.value !== 'quality') sel.value = 'quality';
+  } else {
+    wrap.style.display = '';
+    sel.disabled = false;
+  }
 }
 
-async function renderMore() {
-if (rendered >= current.length) return;
-const fr = document.createDocumentFragment();
-const end = Math.min(rendered + BATCH, current.length);
-for (let i = rendered; i < end; i++) fr.appendChild(await makeCard(current[i]));
-cardsEl.appendChild(fr);
-rendered = end;
+
+function makeCard(it) {
+  const id = String(it.case_id || it['PanTS ID'] || it.id || '');
+  const sex = it.sex || '—';
+  const age = Number.isFinite(it.age) ? `${it.age}y` : '—';
+  const tumor = (it.tumor === 1 ? 'Tumor' : (it.tumor === 0 ? 'No tumor' : '—'));
+
+  const thumbURL = (typeof profileURL === 'function' && typeof idNum === 'function')
+    ? profileURL(idNum(it))
+    : null;
+
+  const wrap = document.createElement('article');
+  wrap.className = 'card';
+  wrap.innerHTML = `
+    <img class="thumb" src="${thumbURL || svg('2D Image')}"
+         onerror="this.src='${svg('2D Image')}'" alt="">
+    <div class="body">
+      <div class="titleRow">
+        <a href="javascript:void(0)" class="caseLink" data-id="${id}">
+          ${id.replace(/^Case\\s*/, '')}
+        </a>
+      </div>
+      <div class="keyRow">
+        <span class="kv"><span class="k">Sex</span><span class="v">${sex}</span></span>
+        <span class="kv"><span class="k">Age</span><span class="v">${age}</span></span>
+        <span class="kv"><span class="tag ${tumor === 'No tumor' ? 'ok' : 'bad'}">${tumor}</span></span>
+      </div>
+    </div>`;
+
+  const open = () => {
+  saveRecent(id);
+
+  // 導到 React viewer，caseId 就是卡片上的 id（例如 PanTS_00007362）
+  const url = new URL(`/case/${encodeURIComponent(id)}`, window.location.origin);
+  window.location.href = url.toString();
+};
+
+  wrap.querySelector('.caseLink')?.addEventListener('click', open);
+  wrap.querySelector('.thumb')?.addEventListener('click', open);
+
+  return wrap;
+}
+
+function renderMore() {
+  if (rendered >= current.length) return;
+  const fr = document.createDocumentFragment();
+  const end = Math.min(rendered + BATCH, current.length);
+  for (let i = rendered; i < end; i++) fr.appendChild(makeCard(current[i]));
+  cardsEl.appendChild(fr);
+  rendered = end;
 }
 
 window.addEventListener('scroll', () => {
-const near = (window.innerHeight + window.scrollY) > (document.body.offsetHeight - 800);
-if (near) renderMore();
+  const near = (window.innerHeight + window.scrollY) > (document.body.offsetHeight - 800);
+  if (near) renderMore();
 });
 
 // === 全域搜尋狀態（若已存在就沿用）===
 window.state = window.state || {
-q: '',
-sex: [],             // ['M','F'] 之一或多選
-tumor: '',           // '' | '1' | '0'
-age_bin: [],         // 例如 ['20-29','30-39'] 或 ['UNKNOWN']
-age_from: '',        // 自由輸入數字字串
-age_to: '',
-ct_phase: [],
-manufacturer: [],
-model: [],
-study_type: [],
-site_nat: [],
-year: [],
-sort_by: '',         // 'quality' 等
-page: 1,
-per_page: 60
+  q: '',
+  sex: [],             // ['M','F'] 之一或多選
+  tumor: '',           // '' | '1' | '0'
+  age_bin: [],         // 例如 ['20-29','30-39'] 或 ['UNKNOWN']
+  age_from: '',        // 自由輸入數字字串
+  age_to: '',
+  ct_phase: [],
+  manufacturer: [],
+  model: [],
+  study_type: [],
+  site_nat: [],
+  year: [],
+  sort_by: '',         // 'quality' 等
+  page: 1,
+  per_page: 10000
 };
 
 // === 把 state 轉成查詢字串，供 facets / search 用 ===
 function qsFromState() {
-const p = new URLSearchParams();
+  const p = new URLSearchParams();
 
-if (state.q) p.set('caseid', state.q);
+  if (state.q) p.set('caseid', state.q);
 
-// sex 多選
-if (Array.isArray(state.sex) && state.sex.length) {
-  state.sex.forEach(v => p.append('sex[]', v));
+  // sex 多選
+  if (Array.isArray(state.sex) && state.sex.length) {
+    state.sex.forEach(v => p.append('sex[]', v));
+  }
+
+  // tumor
+  if (state.tumor !== '') p.set('tumor', state.tumor);
+
+  // age：優先 bins，否則 from/to
+  if (Array.isArray(state.age_bin) && state.age_bin.length) {
+    state.age_bin.forEach(v => p.append('age_bin[]', v));
+  } else {
+    if (state.age_from) p.set('age_from', state.age_from);
+    if (state.age_to)   p.set('age_to',   state.age_to);
+  }
+
+  // 進階 facets 多選
+  ['ct_phase','manufacturer','model','study_type','site_nat','year']
+    .forEach(k => (state[k] || []).forEach(v => p.append(k + '[]', v)));
+
+  if (state.sort_by)  p.set('sort_by',  state.sort_by);
+  if (state.page)     p.set('page',     String(state.page));
+  if (state.per_page) p.set('per_page', String(state.per_page));
+
+  return p.toString();
 }
 
-// tumor
-if (state.tumor !== '') p.set('tumor', state.tumor);
-
-// age：優先 bins，否則 from/to
-if (Array.isArray(state.age_bin) && state.age_bin.length) {
-  state.age_bin.forEach(v => p.append('age_bin[]', v));
-} else {
-  if (state.age_from) p.set('age_from', state.age_from);
-  if (state.age_to)   p.set('age_to',   state.age_to);
+/* === Facet counts：依目前條件即時重算（Booking 風格）=== */
+let _facetTimer = null;
+function refreshFacetsDebounced(delay = 120){
+  clearTimeout(_facetTimer);
+  _facetTimer = setTimeout(() => refreshFacets().catch(console.warn), delay);
 }
-
-// 進階 facets 多選
-['ct_phase','manufacturer','model','study_type','site_nat','year']
-  .forEach(k => (state[k] || []).forEach(v => p.append(k + '[]', v)));
-
-if (state.sort_by)  p.set('sort_by',  state.sort_by);
-if (state.page)     p.set('page',     String(state.page));
-if (state.per_page) p.set('per_page', String(state.per_page));
-
-return p.toString();
-}
-
-// （若你沒有 fetchJSON，補一個簡單版）
-window.fetchJSON = window.fetchJSON || (async function(url, opt){
-const r = await fetch(url, opt);
-if (!r.ok) throw new Error('HTTP ' + r.status);
-return r.json();
-});
 
 async function refreshFacets() {
-try {
-  // 已經凍結 → 只重繪，不再打後端
-  if (FROZEN_FACETS) {
-    updateFacetCounts(FROZEN_FACETS);
-    return;
-  }
-  // 第一次才取
-  const qs  = qsFromState();
-  const url = apiUrl + '/api/facets?fields=ct_phase,manufacturer,model,study_type,site_nat,year&top_k=999&guarantee=0&' + qs;
+  const qs  = qsFromState(); // 帶上目前所有條件
+  const url = '/api/facets?fields=ct_phase,manufacturer,model,study_type,site_nat,year&top_k=999&guarantee=0&' + qs;
   const f   = await fetchJSON(url);
-  FROZEN_FACETS = f?.facets || {};
-  updateFacetCounts(FROZEN_FACETS);
-} catch (err) {
-  console.warn('refreshFacets failed:', err);
+  updateFacetCounts(f?.facets || {});
 }
-}
+
 
 /* ---- 搜尋執行（統一入口） ---- */
 function triggerSearch() {
-const qBox = document.getElementById('q');
-state.q = (qBox?.value || '').trim();
-HAS_SEARCHED = true;
-// 關掉彈窗
-document.getElementById('popID')?.classList.remove('open');
-document.getElementById('popSTA')?.classList.remove('open');
-run();
+  const qBox = document.getElementById('q');
+  state.q = (qBox?.value || '').trim();
+  HAS_SEARCHED = true;
+  // 關掉彈窗
+  document.getElementById('popID')?.classList.remove('open');
+  document.getElementById('popSTA')?.classList.remove('open');
+  run();
 }
 // ===== Recommended IDs =====
 let ID_RECO = [];          // 快取推薦
@@ -2459,392 +2982,402 @@ let ID_RECO_AT = 0;        // 最近抓取時間戳（毫秒）
 const RECO_TTL = 60*1000;  // 1 分鐘內不重抓
 
 function dedup(arr) {
-const seen = new Set(); const out = [];
-for (const x of arr) { const k = String(x); if (!seen.has(k)) { seen.add(k); out.push(k); } }
-return out;
+  const seen = new Set(); const out = [];
+  for (const x of arr) { const k = String(x); if (!seen.has(k)) { seen.add(k); out.push(k); } }
+  return out;
 }
 
 // 取出最近瀏覽
 function getRecentIds() {
-try { return JSON.parse(localStorage.getItem('recentIds')||'[]'); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('recentIds')||'[]'); } catch { return []; }
 }
 
 // 生成 chip 按鈕
 function makeIdChip(id) {
-const b = document.createElement('button');
-b.className = 'chip';
-b.textContent = id;
-b.addEventListener('click', () => {
-  const q = document.getElementById('q');
-  if (q) q.value = id;
-  state.q = id;
-  HAS_SEARCHED = true;
-  run();
-  document.getElementById('popID')?.classList.remove('open');
-});
-return b;
+  const b = document.createElement('button');
+  b.className = 'chip';
+  b.textContent = id;
+  b.addEventListener('click', () => {
+    const q = document.getElementById('q');
+    if (q) q.value = id;
+    state.q = id;
+    HAS_SEARCHED = true;
+    run();
+    document.getElementById('popID')?.classList.remove('open');
+  });
+  return b;
 }
 
 // 繪製「最近瀏覽」
 function renderRecent() {
-const box = document.getElementById('idRecent');
-if (!box) return;
-const r = getRecentIds();
-box.innerHTML = '';
-if (!r.length) { box.innerHTML = '<span class="recMeta">No recent</span>'; return; }
-dedup(r).slice(0, 12).forEach(id => box.appendChild(makeIdChip(id)));
+  const box = document.getElementById('idRecent');
+  if (!box) return;
+  const r = getRecentIds();
+  box.innerHTML = '';
+  if (!r.length) { box.innerHTML = '<span class="recMeta">No recent</span>'; return; }
+  dedup(r).slice(0, 12).forEach(id => box.appendChild(makeIdChip(id)));
 }
 
 // 抓取推薦（有快取）
 async function fetchRecommended() {
-const now = Date.now();
-if (ID_RECO.length && (now - ID_RECO_AT) < RECO_TTL) return ID_RECO;
+  const now = Date.now();
+  if (ID_RECO.length && (now - ID_RECO_AT) < RECO_TTL) return ID_RECO;
 
-try {
-  // 以「品質」做推薦，最多 12 筆；你也可以換成其他排序
-  const url = apiUrl + '/api/search?per_page=12&sort_by=quality';
-  const data = await fetchJSON(url);
-  const items = Array.isArray(data?.items) ? data.items : [];
-  ID_RECO = items
-    .map(it => String(it.case_id || it['PanTS ID'] || it.id || ''))
-    .filter(Boolean);
-  ID_RECO_AT = now;
-} catch (e) {
-  console.warn('fetchRecommended failed', e);
-  ID_RECO = [];
-}
-return ID_RECO;
+  try {
+    // 以「品質」做推薦，最多 12 筆；你也可以換成其他排序
+    const url = '/api/search?per_page=10000&sort_by=quality';
+    const data = await fetchJSON(url);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    ID_RECO = items
+      .map(it => String(it.case_id || it['PanTS ID'] || it.id || ''))
+      .filter(Boolean);
+    ID_RECO_AT = now;
+  } catch (e) {
+    console.warn('fetchRecommended failed', e);
+    ID_RECO = [];
+  }
+  return ID_RECO;
 }
 
 // 繪製「Recommended IDs」
 async function renderIdRecommendations() {
-const box = document.getElementById('idReco');
-if (!box) return;
-box.innerHTML = '<span class="recMeta">Loading…</span>';
+  const box = document.getElementById('idReco');
+  if (!box) return;
+  box.innerHTML = '<span class="recMeta">Loading…</span>';
 
-// 先抓推薦；抓不到就用最近瀏覽頂上
-let list = await fetchRecommended();
-if (!list || !list.length) list = getRecentIds();
+  // 先抓推薦；抓不到就用最近瀏覽頂上
+  let list = await fetchRecommended();
+  if (!list || !list.length) list = getRecentIds();
 
-box.innerHTML = '';
-if (!list.length) {
-  box.innerHTML = '<span class="recMeta">No suggestions</span>';
-  return;
-}
-dedup(list).slice(0, 12).forEach(id => box.appendChild(makeIdChip(id)));
+  box.innerHTML = '';
+  if (!list.length) {
+    box.innerHTML = '<span class="recMeta">No suggestions</span>';
+    return;
+  }
+  dedup(list).slice(0, 12).forEach(id => box.appendChild(makeIdChip(id)));
 }
 
 // ===== 事件：開啟彈窗時重新渲染 =====
 (function bindIdPop() {
-const wrap = document.getElementById('popID');
-const input = document.getElementById('q');
-if (!wrap || !input) return;
+  const wrap = document.getElementById('popID');
+  const input = document.getElementById('q');
+  if (!wrap || !input) return;
 
-// 打開彈窗
-const open = async () => {
-  wrap.classList.add('open');
-  await renderIdRecommendations();
-  renderRecent();
-};
-// 關閉彈窗
-const close = () => wrap.classList.remove('open');
+  // 打開彈窗
+  const open = async () => {
+    wrap.classList.add('open');
+    await renderIdRecommendations();
+    renderRecent();
+  };
+  // 關閉彈窗
+  const close = () => wrap.classList.remove('open');
 
-// 聚焦/點擊打開，按 Esc 關閉
-input.addEventListener('focus', open);
-input.addEventListener('click', open);
-input.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  // 聚焦/點擊打開，按 Esc 關閉
+  input.addEventListener('focus', open);
+  input.addEventListener('click', open);
+  input.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 
-// 點擊外面區域就關閉
-document.addEventListener('click', (e) => {
-  if (!wrap.contains(e.target)) close();
-});
+  // 點擊外面區域就關閉
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) close();
+  });
 })();
 /* ---- Search 按鈕 ---- */
 document.getElementById('searchBtn')?.addEventListener('click', (e) => {
-e.preventDefault();
-e.stopPropagation();
-// 統一走主流程，避免重複請求 & 數字閃爍
-triggerSearch();
+  e.preventDefault();
+  e.stopPropagation();
+  // 統一走主流程，避免重複請求 & 數字閃爍
+  triggerSearch();
 });
 
 /* ---- 在輸入框按 Enter 搜尋、按 Esc 清空並搜尋全部 ---- */
 
 const qInput = document.getElementById('q');
 qInput?.addEventListener('keydown', (e) => {
-if (e.key === 'Enter') {
-  e.preventDefault();
-  triggerSearch();
-} else if (e.key === 'Escape') {
-  qInput.value = '';
-  triggerSearch(); // 空字串 → 搜尋全部
-}
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    triggerSearch();
+  } else if (e.key === 'Escape') {
+    qInput.value = '';
+    triggerSearch(); // 空字串 → 搜尋全部
+  }
 });
 
 
 /* ---- Search run ---- */
 async function run() {
-// 1) 同步查詢字串
-const qBox  = document.getElementById('q');
-const query = (qBox?.value || '').trim();
-state.q = query;
+  // 1) 同步查詢字串
+  const qBox  = document.getElementById('q');
+  const query = (qBox?.value || '').trim();
+  state.q = query;
 
-// 2) 先刷新 facets（照你原流程）
-await refreshFacets();
+  // 2) 先刷新 facets（照你原流程）
+  await refreshFacets();
 
-// 3) 打第一次 /api/search
-const p = new URLSearchParams(qsFromState());
-p.set('per_page', '10000');
-let data = await fetchJSON(apiUrl + '/api/search?' + p.toString());
-lastFetched = (data.items || []).filter(Boolean);
-
-// 4) 僅在「沒有任何條件且 0 筆」時才 fallback 抓全量
-const hasAnyFilter = (() => {
-  const arrLen = k => Array.isArray(state[k]) ? state[k].length : 0;
-  return !!(state.q ||
-    arrLen('sex') || state.tumor !== '' ||
-    state.age_from || state.age_to || arrLen('age_bin') ||
-    arrLen('ct_phase') || arrLen('manufacturer') || arrLen('model') ||
-    arrLen('study_type') || arrLen('site_nat') || arrLen('year'));
-})();
-
-if (!hasAnyFilter && query === '' && lastFetched.length === 0) {
-  data = await fetchJSON(apiUrl + '/api/search?per_page=10000&sort_by=id');
+  // 3) 打第一次 /api/search
+  const p = new URLSearchParams(qsFromState());
+  p.set('per_page', '10000');
+  let data = await fetchJSON('/api/search?' + p.toString());
   lastFetched = (data.items || []).filter(Boolean);
-}
 
-// 5) 前端自訂過濾（保留你的原本邏輯）
-const norm = s => String(s ?? '').trim().toLowerCase();
-lastFetched = lastFetched.filter(it => {
-  const hasAll = (selected, value) => selected.length === 0 || selected.some(v => norm(v) === norm(value));
-  const overlap = (selected, tokens) => {
-    if (selected.length === 0) return true;
-    const sel = selected.map(norm);
-    return tokens.some(t => sel.includes(norm(t)));
-  };
-  const model = pickField(it, ['manufacturer model', 'Manufacturer model', 'model', 'Model']);
-  if (!hasAll(state.model, model)) return false;
+  // 4) 僅在「沒有任何條件且 0 筆」時才 fallback 抓全量
+  const hasAnyFilter = (() => {
+    const arrLen = k => Array.isArray(state[k]) ? state[k].length : 0;
+    return !!(state.q ||
+      arrLen('sex') || state.tumor !== '' ||
+      state.age_from || state.age_to || arrLen('age_bin') ||
+      arrLen('ct_phase') || arrLen('manufacturer') || arrLen('model') ||
+      arrLen('study_type') || arrLen('site_nat') || arrLen('year'));
+  })();
 
-  const types = splitTokens(pickField(it, ['study type', 'Study type', 'study_type', 'type', 'Type']));
-  const nats  = splitTokens(pickField(it, ['site nationality', 'Site nationality', 'site_nat', 'nationality', 'country', 'Country']), mapNat);
-  const year  = pickField(it, ['study year', 'Study year', 'year', 'study_year', 'Year']);
+  if (!hasAnyFilter && query === '' && lastFetched.length === 0) {
+    data = await fetchJSON('/api/search?per_page=10000&sort_by=id');
+    lastFetched = (data.items || []).filter(Boolean);
+  }
 
-  return overlap(state.study_type, types) &&
-          overlap(state.site_nat, nats) &&
-          hasAll(state.year, year);
-});
+  // 5) 前端自訂過濾（保留你的原本邏輯）
+  const norm = s => String(s ?? '').trim().toLowerCase();
+  lastFetched = lastFetched.filter(it => {
+    const hasAll = (selected, value) => selected.length === 0 || selected.some(v => norm(v) === norm(value));
+    const overlap = (selected, tokens) => {
+      if (selected.length === 0) return true;
+      const sel = selected.map(norm);
+      return tokens.some(t => sel.includes(norm(t)));
+    };
+    const model = pickField(it, ['manufacturer model', 'Manufacturer model', 'model', 'Model']);
+    if (!hasAll(state.model, model)) return false;
 
-// 6) 以「前端可見數」為準覆寫 LAST_TOTAL，避免 9901
-window.LAST_TOTAL = lastFetched.length;
+    const types = splitTokens(pickField(it, ['study type', 'Study type', 'study_type', 'type', 'Type']));
+    const nats  = splitTokens(pickField(it, ['site nationality', 'Site nationality', 'site_nat', 'nationality', 'country', 'Country']), mapNat);
+    const year  = pickField(it, ['study year', 'Study year', 'year', 'study_year', 'Year']);
 
-// 7) 更新 UI + 渲染
-HAS_SEARCHED = true;           // 確保顯示結果區
-updatePanels();
-await renderAfterFetch(lastFetched);
+    return overlap(state.study_type, types) &&
+           overlap(state.site_nat, nats) &&
+           hasAll(state.year, year);
+  });
+
+  // 6) 以「前端可見數」為準覆寫 LAST_TOTAL，避免 9901
+  window.LAST_TOTAL = lastFetched.length;
+
+  // 7) 更新 UI + 渲染
+  HAS_SEARCHED = true;           // 確保顯示結果區
+  updatePanels();
+  renderAfterFetch(lastFetched);
 }
 
 /* =========================
-  STA / Recent + Age 多選
-  ========================= */
+   STA / Recent + Age 多選
+   ========================= */
 // --- Age：多選 + Unknown（外觀改成與 Tumor 一致的平面 pill） ---
 function renderAgeChips(list) {
-const w = $('#ageChips');
-if (!w) return;
+  const w = $('#ageChips');
+  if (!w) return;
 
-// 確保外觀 class 存在（平面、不像按鈕）
-w.classList.add('chipArea', 'flat');
-w.innerHTML = '';
+  // 確保外觀 class 存在（平面、不像按鈕）
+  w.classList.add('chipArea', 'flat');
+  w.innerHTML = '';
 
-const bins = Array.isArray(list) && list.length
-  ? list.slice()
-  : ['0-9','10-19','20-29','30-39','40-49','50-59','60-69','70-79','80-89','90-99'];
+  const bins = Array.isArray(list) && list.length
+    ? list.slice()
+    : ['0-9','10-19','20-29','30-39','40-49','50-59','60-69','70-79','80-89','90-99'];
 
-// Any
-const anyBtn = document.createElement('button');
-anyBtn.className = 'chip';
-anyBtn.id = 'ageAny';
-anyBtn.textContent = 'Any';       // ← 原本是 "Any age"
-anyBtn.addEventListener('click', () => {
-  state.age_bin = [];
-  state.age_from = '';
-  state.age_to = '';
-  $$('#ageChips .chip').forEach(x => x.classList.remove('active'));
-  anyBtn.classList.add('active');
-  updateSTASummary();
-  // 不 auto-search；按下 Search 才查
-});
-w.appendChild(anyBtn);
+  // Any
+  const anyBtn = document.createElement('button');
+  anyBtn.className = 'chip';
+  anyBtn.id = 'ageAny';
+  anyBtn.textContent = 'Any';       // ← 原本是 "Any age"
+  anyBtn.addEventListener('click', () => {
+    state.age_bin = [];
+    state.age_from = '';
+    state.age_to = '';
+    $$('#ageChips .chip').forEach(x => x.classList.remove('active'));
+    anyBtn.classList.add('active');
+    updateSTASummary();
+    // 不 auto-search；按下 Search 才查
+  });
+  w.appendChild(anyBtn);
 
-// bins（多選）
-bins.forEach(label => {
-  const btn = document.createElement('button');
-  btn.className = 'chip';
-  btn.textContent = label;
-  btn.dataset.bin = label;
-  btn.addEventListener('click', () => {
-    const bin = btn.dataset.bin;
+  // bins（多選）
+  bins.forEach(label => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = label;
+    btn.dataset.bin = label;
+    btn.addEventListener('click', () => {
+      const bin = btn.dataset.bin;
+      const i = state.age_bin.indexOf(bin);
+      if (i === -1) state.age_bin.push(bin); else state.age_bin.splice(i, 1);
+      btn.classList.toggle('active');
+      const any = $('#ageAny');
+      if (any) any.classList.toggle('active', state.age_bin.length === 0);
+      // 選了 bins 就清 from/to
+      state.age_from = '';
+      state.age_to = '';
+      updateSTASummary();
+      // 不 auto-search；按下 Search 才查
+    });
+    w.appendChild(btn);
+  });
+
+  // Unknown
+  const unk = document.createElement('button');
+  unk.className = 'chip';
+  unk.textContent = 'Unknown';
+  unk.dataset.bin = 'UNKNOWN';
+  unk.addEventListener('click', () => {
+    const bin = 'UNKNOWN';
     const i = state.age_bin.indexOf(bin);
     if (i === -1) state.age_bin.push(bin); else state.age_bin.splice(i, 1);
-    btn.classList.toggle('active');
+    unk.classList.toggle('active');
     const any = $('#ageAny');
     if (any) any.classList.toggle('active', state.age_bin.length === 0);
-    // 選了 bins 就清 from/to
     state.age_from = '';
     state.age_to = '';
     updateSTASummary();
     // 不 auto-search；按下 Search 才查
   });
-  w.appendChild(btn);
-});
+  w.appendChild(unk);
 
-// Unknown
-const unk = document.createElement('button');
-unk.className = 'chip';
-unk.textContent = 'Unknown';
-unk.dataset.bin = 'UNKNOWN';
-unk.addEventListener('click', () => {
-  const bin = 'UNKNOWN';
-  const i = state.age_bin.indexOf(bin);
-  if (i === -1) state.age_bin.push(bin); else state.age_bin.splice(i, 1);
-  unk.classList.toggle('active');
-  const any = $('#ageAny');
-  if (any) any.classList.toggle('active', state.age_bin.length === 0);
-  state.age_from = '';
-  state.age_to = '';
-  updateSTASummary();
-  // 不 auto-search；按下 Search 才查
-});
-w.appendChild(unk);
-
-// 初始 active
-if (Array.isArray(state.age_bin) && state.age_bin.length) {
-  state.age_bin.forEach(b => {
-    const btn = $(`#ageChips .chip[data-bin="${CSS.escape(b)}"]`);
-    if (btn) btn.classList.add('active');
-  });
-} else {
-  anyBtn.classList.add('active');
-}
+  // 初始 active
+  if (Array.isArray(state.age_bin) && state.age_bin.length) {
+    state.age_bin.forEach(b => {
+      const btn = $(`#ageChips .chip[data-bin="${CSS.escape(b)}"]`);
+      if (btn) btn.classList.add('active');
+    });
+  } else {
+    anyBtn.classList.add('active');
+  }
 }
 
 
 
 /* ===== Viewer ===== */
 function showPreparing(on) {
-$('#prepPage').classList.toggle('show', !!on);
-$('#prepPage').setAttribute('aria-hidden', on ? 'false' : 'true');
+  $('#prepPage').classList.toggle('show', !!on);
+  $('#prepPage').setAttribute('aria-hidden', on ? 'false' : 'true');
 }
 
 function openViewer(id) {
-// showPreparing(true);
-const num = parseInt(id.match(/\d+$/)[0], 10);
-window.location.href = "/case/" + num;
-// // 標記 viewer 模式（會觸發 body.viewer-open .hero 隱藏）
-// document.body.style.overflow = 'hidden';
-// document.body.classList.add('viewer-open');
+  // 直接導向 React viewer 的 route：/case/:caseId
+  const url = new URL(`/case/${encodeURIComponent(id)}`, window.location.origin);
+  window.location.href = url.toString();
 
-// const v = $('#viewer');
-// v.classList.add('compact');
-// v.setAttribute('aria-hidden', 'false');
+  // 舊的 overlay viewer 不再使用，所以整段都不執行
+  return;
 
-// // 初始文字/占位
-// $('#vCard').style.display = 'none';
-// $('#vSidebar').style.display = 'none';
-// $('#caseTitle').textContent = 'Case ID: ' + id;
-// $('#axial').src = vsvg('2D Axial');
-// $('#sagittal').src = vsvg('2D Sagittal');
-// $('#coronal').src = vsvg('2D Coronal');
+  /*
+  // -------- 以下是舊版 viewer，保留備用 --------
+  showPreparing(true);
 
-// // 讓 viewer 一定在最上面
-// v.style.position = 'fixed';
-// v.style.inset = '0';
-// v.style.zIndex = '10000';
+  // 標記 viewer 模式（會觸發 body.viewer-open .hero 隱藏）
+  document.body.style.overflow = 'hidden';
+  document.body.classList.add('viewer-open');
 
-// setTimeout(() => {
-//   showPreparing(false);
-//   v.classList.add('show');
-//   $('#prep')?.classList.add('hidden');
+  const v = $('#viewer');
+  v.classList.add('compact');
+  v.setAttribute('aria-hidden', 'false');
 
-//   // 更新網址
-//   const u = new URL(location.href);
-//   u.searchParams.set('case', id);
-//   history.replaceState({}, '', u);
-// }, 700);
+  // 初始文字/占位
+  $('#vCard').style.display = 'none';
+  $('#vSidebar').style.display = 'none';
+  $('#caseTitle').textContent = 'Case ID: ' + id;
+  $('#axial').src = vsvg('2D Axial');
+  $('#sagittal').src = vsvg('2D Sagittal');
+  $('#coronal').src = vsvg('2D Coronal');
+
+  // viewer 在最上面
+  v.style.position = 'fixed';
+  v.style.inset = '0';
+  v.style.zIndex = '10000';
+
+  setTimeout(() => {
+    showPreparing(false);
+    v.classList.add('show');
+    $('#prep')?.classList.add('hidden');
+
+    // 更新網址
+    const u = new URL(location.href);
+    u.searchParams.set('case', id);
+    history.replaceState({}, '', u);
+  }, 700);
+  */
 }
-// document.activeElement?.blur();  // 移除當前焦點，避免 aria-hidden 警告
-// document.getElementById('viewer').setAttribute('aria-hidden', 'true');
+
+document.activeElement?.blur();  // 移除當前焦點，避免 aria-hidden 警告
+document.getElementById('viewer').setAttribute('aria-hidden', 'true');
 
 function closeViewer() {
-const v = $('#viewer');
-v.classList.remove('show');
-v.setAttribute('aria-hidden', 'true');
+  const v = $('#viewer');
+  v.classList.remove('show');
+  v.setAttribute('aria-hidden', 'true');
 
-// 還原捲動與 viewer 標記 → 搜尋列會自動回來
-document.body.style.overflow = '';
-document.body.classList.remove('viewer-open');
+  // 還原捲動與 viewer 標記 → 搜尋列會自動回來
+  document.body.style.overflow = '';
+  document.body.classList.remove('viewer-open');
 
-// 清掉 URL 參數
-const u = new URL(location.href);
-u.searchParams.delete('case');
-history.replaceState({}, '', u);
+  // 清掉 URL 參數
+  const u = new URL(location.href);
+  u.searchParams.delete('case');
+  history.replaceState({}, '', u);
 }
 
 $('#btnBack').addEventListener('click', closeViewer);
 
 const CLASS_MAP = [
-{ name: 'Vascular System', key: 'vascular', items: [['aorta'], ['celiac_artery'], ['superior_mesenteric_artery'], ['postcava'], ['veins']] },
-{ name: 'Digestive System', key: 'digestive', items: [['Pancreas'], ['colon'], ['duodenum'], ['stomach'], ['liver'], ['common_bile_duct'], ['gall_bladder']] },
-{ name: 'Endocrine System', key: 'endocrine', items: [['adrenal_gland_left'], ['adrenal_gland_right']] },
-{ name: 'Urinary System', key: 'urinary', items: [['Kidneys'], ['bladder']] },
-{ name: 'Skeletal System', key: 'skeletal', items: [['femur_left'], ['femur_right']] },
-{ name: 'Lymphatic System', key: 'lymphatic', items: [['spleen']] },
-{ name: 'Reproductive System', key: 'reproductive', items: [['prostate']] },
-{ name: 'Respiratory System', key: 'respiratory', items: [['lung_left'], ['lung_right']] }
+  { name: 'Vascular System', key: 'vascular', items: [['aorta'], ['celiac_artery'], ['superior_mesenteric_artery'], ['postcava'], ['veins']] },
+  { name: 'Digestive System', key: 'digestive', items: [['Pancreas'], ['colon'], ['duodenum'], ['stomach'], ['liver'], ['common_bile_duct'], ['gall_bladder']] },
+  { name: 'Endocrine System', key: 'endocrine', items: [['adrenal_gland_left'], ['adrenal_gland_right']] },
+  { name: 'Urinary System', key: 'urinary', items: [['Kidneys'], ['bladder']] },
+  { name: 'Skeletal System', key: 'skeletal', items: [['femur_left'], ['femur_right']] },
+  { name: 'Lymphatic System', key: 'lymphatic', items: [['spleen']] },
+  { name: 'Reproductive System', key: 'reproductive', items: [['prostate']] },
+  { name: 'Respiratory System', key: 'respiratory', items: [['lung_left'], ['lung_right']] }
 ];
 
 
 function renderClassMap() {
-const root = document.getElementById('cmRoot'); if (!root) return; root.innerHTML = '';
-CLASS_MAP.forEach(grp => {
-  const box = document.createElement('section'); box.className = 'cm-group';
-  const row = document.createElement('div'); row.className = 'cm-row';
-  row.innerHTML = `<span class="chev" aria-hidden="true">▾</span><span class="title">${grp.name}</span><input type="checkbox" class="grpCheck" checked aria-label="Toggle ${grp.name}">`;
-  const items = document.createElement('div'); items.className = 'cm-items';
-  grp.items.forEach(([label]) => {
-    const id = `cm_${grp.key}_${label}`.replace(/\W+/g, '_').toLowerCase();
-    const r = document.createElement('label'); r.className = 'cm-item';
-    r.innerHTML = `<input type="checkbox" class="itemCheck" id="${id}" data-group="${grp.key}" data-name="${label}" checked><span class="name">${label.replace(/_/g, ' ')}</span>`;
-    items.appendChild(r);
+  const root = document.getElementById('cmRoot'); if (!root) return; root.innerHTML = '';
+  CLASS_MAP.forEach(grp => {
+    const box = document.createElement('section'); box.className = 'cm-group';
+    const row = document.createElement('div'); row.className = 'cm-row';
+    row.innerHTML = `<span class="chev" aria-hidden="true">▾</span><span class="title">${grp.name}</span><input type="checkbox" class="grpCheck" checked aria-label="Toggle ${grp.name}">`;
+    const items = document.createElement('div'); items.className = 'cm-items';
+    grp.items.forEach(([label]) => {
+      const id = `cm_${grp.key}_${label}`.replace(/\W+/g, '_').toLowerCase();
+      const r = document.createElement('label'); r.className = 'cm-item';
+      r.innerHTML = `<input type="checkbox" class="itemCheck" id="${id}" data-group="${grp.key}" data-name="${label}" checked><span class="name">${label.replace(/_/g, ' ')}</span>`;
+      items.appendChild(r);
+    });
+    let open = true; const chev = row.querySelector('.chev');
+    const setOpen = (on) => { open = on; box.classList.toggle('closed', !on); chev.textContent = on ? '▾' : '▸'; };
+    row.addEventListener('click', (e) => { const t = e.target; if (t && t.classList && t.classList.contains('grpCheck')) return; setOpen(!open); });
+    setOpen(true);
+    const grpCheck = row.querySelector('input.grpCheck');
+    if (grpCheck) { grpCheck.addEventListener('change', () => { const checked = grpCheck.checked; items.querySelectorAll('input.itemCheck').forEach(c => { c.checked = checked; }); }); }
+    box.appendChild(row); box.appendChild(items); root.appendChild(box);
   });
-  let open = true; const chev = row.querySelector('.chev');
-  const setOpen = (on) => { open = on; box.classList.toggle('closed', !on); chev.textContent = on ? '▾' : '▸'; };
-  row.addEventListener('click', (e) => { const t = e.target; if (t && t.classList && t.classList.contains('grpCheck')) return; setOpen(!open); });
-  setOpen(true);
-  const grpCheck = row.querySelector('input.grpCheck');
-  if (grpCheck) { grpCheck.addEventListener('change', () => { const checked = grpCheck.checked; items.querySelectorAll('input.itemCheck').forEach(c => { c.checked = checked; }); }); }
-  box.appendChild(row); box.appendChild(items); root.appendChild(box);
-});
-const btn = document.getElementById('toggleAll');
-if (btn) {
-  btn.onclick = () => {
-    const boxes = Array.from(document.querySelectorAll('.cm-group .grpCheck'));
-    const turnOff = boxes.length && boxes.every(b => b.checked);
-    boxes.forEach(b => b.checked = !turnOff);
-    document.querySelectorAll('.cm-group .itemCheck').forEach(c => c.checked = !turnOff);
-  };
-}
+  const btn = document.getElementById('toggleAll');
+  if (btn) {
+    btn.onclick = () => {
+      const boxes = Array.from(document.querySelectorAll('.cm-group .grpCheck'));
+      const turnOff = boxes.length && boxes.every(b => b.checked);
+      boxes.forEach(b => b.checked = !turnOff);
+      document.querySelectorAll('.cm-group .itemCheck').forEach(c => c.checked = !turnOff);
+    };
+  }
 }
 
 // settings / classmap toggle
 document.getElementById('btnGear')?.addEventListener('click', () => {
-const card = $('#vCard'), side = $('#vSidebar'); if (!card || !side) return;
-side.style.display = 'none';
-card.style.display = (getComputedStyle(card).display === 'none') ? 'block' : 'none';
+  const card = $('#vCard'), side = $('#vSidebar'); if (!card || !side) return;
+  side.style.display = 'none';
+  card.style.display = (getComputedStyle(card).display === 'none') ? 'block' : 'none';
 });
 document.getElementById('openClassMap')?.addEventListener('click', () => {
-const side = $('#vSidebar'), card = $('#vCard'); if (!side || !card) return;
-card.style.display = 'none';
-if (getComputedStyle(side).display === 'none') { renderClassMap(); side.style.display = 'block'; }
-else { side.style.display = 'none'; }
+  const side = $('#vSidebar'), card = $('#vCard'); if (!side || !card) return;
+  card.style.display = 'none';
+  if (getComputedStyle(side).display === 'none') { renderClassMap(); side.style.display = 'block'; }
+  else { side.style.display = 'none'; }
 });
 
 ['op', 'lvl', 'win'].forEach(id => { const r = $('#' + id), lab = $('#' + id + 'v'); r?.addEventListener('input', () => { if (lab) lab.textContent = r.value; }); });
@@ -2858,14 +3391,14 @@ $('#zoomOut')?.addEventListener('click', () => { Z = Math.max(1, Z - 0.2); apply
 
 const rpModal = $('#reportModal');
 $('#download')?.addEventListener('click', () => {
-['axial', 'sagittal', 'coronal'].forEach(id => {
-  const img = document.getElementById(id);
-  if (!img || !img.src) return;
-  const a = document.createElement('a');
-  a.href = img.src;
-  a.download = `case-${(document.getElementById('caseTitle')?.textContent || 'id').replace(/\D+/g, '')}-${id}.png`;
-  document.body.appendChild(a); a.click(); a.remove();
-});
+  ['axial', 'sagittal', 'coronal'].forEach(id => {
+    const img = document.getElementById(id);
+    if (!img || !img.src) return;
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = `case-${(document.getElementById('caseTitle')?.textContent || 'id').replace(/\D+/g, '')}-${id}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
 });
 $('#report')?.addEventListener('click', () => rpModal?.classList.add('show'));
 $('#rpClose')?.addEventListener('click', () => rpModal?.classList.remove('show'));
@@ -2876,394 +3409,475 @@ rpModal?.addEventListener('click', e => { if (e.target === rpModal) rpModal.clas
 
 /* ---- Recent render ---- */
 function renderRecent() {
-const box = $('#idRecent');
-if (!box) return;
+  const box = $('#idRecent');
+  if (!box) return;
 
-const r = JSON.parse(localStorage.getItem('recentIds') || '[]');
-box.innerHTML = '';
+  const r = JSON.parse(localStorage.getItem('recentIds') || '[]');
+  box.innerHTML = '';
 
-if (!r.length) {
-  box.innerHTML = '<span class="recMeta">No recent</span>';
-  return;
-}
+  if (!r.length) {
+    box.innerHTML = '<span class="recMeta">No recent</span>';
+    return;
+  }
 
-r.forEach(id => {
-  const b = document.createElement('button');
-  b.className = 'chip';
-  b.textContent = id;
-  b.addEventListener('click', () => {
-    $('#q').value = id;
-    state.q = id;
-    HAS_SEARCHED = true;
-    run();
-    $('#popID')?.classList.remove('open');
+  r.forEach(id => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = id;
+    b.addEventListener('click', () => {
+      $('#q').value = id;
+      state.q = id;
+      HAS_SEARCHED = true;
+      run();
+      $('#popID')?.classList.remove('open');
+    });
+    box.appendChild(b);
   });
-  box.appendChild(b);
-});
 }
 
 /* ---- STA Summary ---- */
 function updateSTASummary() {
-const tumor =
-  state.tumor === '' ? 'Any tumor' :
-  state.tumor === '1' ? 'Tumor' : 'No tumor';
+  const tumor =
+    state.tumor === '' ? 'Any tumor' :
+    state.tumor === '1' ? 'Tumor' : 'No tumor';
 
-const toArray = v => Array.isArray(v) ? v : (v ? [String(v)] : []);
-const selSex = toArray(state.sex);
-const mapSex = s => (s === 'M' ? 'Male' : s === 'F' ? 'Female' : 'Unknown');
-const sexLabel = selSex.length ? selSex.map(mapSex).join('/') : 'Any sex';
+  const toArray = v => Array.isArray(v) ? v : (v ? [String(v)] : []);
+  const selSex = toArray(state.sex);
+  const mapSex = s => (s === 'M' ? 'Male' : s === 'F' ? 'Female' : 'Unknown');
+  const sexLabel = selSex.length ? selSex.map(mapSex).join('/') : 'Any sex';
 
-let ageLabel = 'Any age';
-if (Array.isArray(state.age_bin) && state.age_bin.length) {
-  const bins = state.age_bin.slice();
-  const onlyUnknown = bins.length === 1 && bins[0] === 'UNKNOWN';
-  if (onlyUnknown) {
-    ageLabel = 'UNKNOWN';
-  } else {
-    const shown = bins.filter(b => b !== 'UNKNOWN').slice(0, 3).join(', ');
-    const more = bins.filter(b => b !== 'UNKNOWN').length > 3
-      ? ` +${bins.filter(b => b !== 'UNKNOWN').length - 3}` : '';
-    ageLabel = shown ? (shown + more) : 'UNKNOWN';
+  let ageLabel = 'Any age';
+  if (Array.isArray(state.age_bin) && state.age_bin.length) {
+    const bins = state.age_bin.slice();
+    const onlyUnknown = bins.length === 1 && bins[0] === 'UNKNOWN';
+    if (onlyUnknown) {
+      ageLabel = 'UNKNOWN';
+    } else {
+      const shown = bins.filter(b => b !== 'UNKNOWN').slice(0, 3).join(', ');
+      const more = bins.filter(b => b !== 'UNKNOWN').length > 3
+        ? ` +${bins.filter(b => b !== 'UNKNOWN').length - 3}` : '';
+      ageLabel = shown ? (shown + more) : 'UNKNOWN';
+    }
   }
-}
-const sta = document.getElementById('staSummary');
-if (sta) sta.textContent = `${tumor} · ${sexLabel} · ${ageLabel}`;
+  const sta = document.getElementById('staSummary');
+  if (sta) sta.textContent = `${tumor} · ${sexLabel} · ${ageLabel}`;
 }
 
 /* ---- Search / Sex / Tumor / Sort ---- */
 // Search button
 (() => {
-const btn = document.getElementById('searchBtn');
-if (!btn) return;
-btn.addEventListener('click', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  HAS_SEARCHED = true;
-  run();
-  document.getElementById('popID')?.classList.remove('open');
-  document.getElementById('popSTA')?.classList.remove('open');
-});
+  const btn = document.getElementById('searchBtn');
+  if (!btn) return;
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    HAS_SEARCHED = true;
+    run();
+    document.getElementById('popID')?.classList.remove('open');
+    document.getElementById('popSTA')?.classList.remove('open');
+  });
 })();
 
 // Sex multi
 (() => {
-const box = document.getElementById('sexChips');
-if (!box) return;
-box.addEventListener('click', (e) => {
-  const b = e.target.closest('.chip');
-  if (!b) return;
-  e.stopPropagation();
-  const val = b.dataset.sex ?? '';
-  if (!Array.isArray(state.sex)) state.sex = state.sex ? [String(state.sex)] : [];
-  if (val === '') {
-    state.sex = [];
-    $$('#sexChips .chip').forEach(x => x.classList.remove('active'));
-    $$('#sexChips .chip[data-sex=""]').forEach(x => x.classList.add('active'));
-  } else {
-    b.classList.toggle('active');
-    const i = state.sex.indexOf(val);
-    if (i === -1) state.sex.push(val); else state.sex.splice(i, 1);
-    const anyBtn = $$('#sexChips .chip[data-sex=""]')[0];
-    if (anyBtn) anyBtn.classList.toggle('active', state.sex.length === 0);
-  }
-  updateSTASummary();
-});
+  const box = document.getElementById('sexChips');
+  if (!box) return;
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    e.stopPropagation();
+    const val = b.dataset.sex ?? '';
+    if (!Array.isArray(state.sex)) state.sex = state.sex ? [String(state.sex)] : [];
+    if (val === '') {
+      state.sex = [];
+      $$('#sexChips .chip').forEach(x => x.classList.remove('active'));
+      $$('#sexChips .chip[data-sex=""]').forEach(x => x.classList.add('active'));
+    } else {
+      b.classList.toggle('active');
+      const i = state.sex.indexOf(val);
+      if (i === -1) state.sex.push(val); else state.sex.splice(i, 1);
+      const anyBtn = $$('#sexChips .chip[data-sex=""]')[0];
+      if (anyBtn) anyBtn.classList.toggle('active', state.sex.length === 0);
+    }
+    updateSTASummary();
+  });
 })();
 
 // Tumor single
 (() => {
-const box = document.getElementById('tumorChips');
-if (!box) return;
-box.addEventListener('click', (e) => {
-  const b = e.target.closest('.chip');
-  if (!b) return;
-  e.stopPropagation();
-  state.tumor = b.dataset.tumor ?? '';
-  $$('#tumorChips .chip').forEach(x =>
-    x.classList.toggle('active', (x.dataset.tumor ?? '') === state.tumor)
-  );
-  updateSTASummary();
-});
+  const box = document.getElementById('tumorChips');
+  if (!box) return;
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    e.stopPropagation();
+    state.tumor = b.dataset.tumor ?? '';
+    $$('#tumorChips .chip').forEach(x =>
+      x.classList.toggle('active', (x.dataset.tumor ?? '') === state.tumor)
+    );
+    updateSTASummary();
+  });
 })();
 
 // Sort select
 (() => {
-const sortSel = document.getElementById('sortBy');
-if (!sortSel) return;
-sortSel.addEventListener('change', async () => {
-  state.sort_by = sortSel.value || 'quality';
-  if (HAS_SEARCHED) await renderAfterFetch(lastFetched || []);
-});
+  const sortSel = document.getElementById('sortBy');
+  if (!sortSel) return;
+  sortSel.addEventListener('change', () => {
+    state.sort_by = sortSel.value || 'quality';
+    if (HAS_SEARCHED) renderAfterFetch(lastFetched || []);
+  });
 })();
+
 // 拉一次完整清單到 ALL_ITEMS（給 Browse / 後備用）
 async function bootstrapLists(){
-try{
-  const data = await fetch(apiUrl + '/api/search?per_page=10000&sort_by=id', {cache:'no-store'})
-                .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
-  ALL_ITEMS = data.items || [];
-}catch(e){
-  console.warn('bootstrapLists failed:', e);
-  ALL_ITEMS = [];
+  try{
+    const data = await fetch('/api/search?per_page=10000&sort_by=id', {cache:'no-store'})
+                  .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
+    ALL_ITEMS = data.items || [];
+  }catch(e){
+    console.warn('bootstrapLists failed:', e);
+    ALL_ITEMS = [];
+  }
 }
-}
+
 /* ---- 初始化 ---- */
 (async function init() {
-// 有就呼叫；避免缺函式時中斷
-try { renderRecent?.(); } catch(e){ console.warn('renderRecent failed:', e); }
+  // 有就呼叫；避免缺函式時中斷
+  try { renderRecent?.(); } catch(e){ console.warn('renderRecent failed:', e); }
 
-if (typeof bootstrapLists === 'function') {
-  await bootstrapLists();
-} else {
-  console.warn('bootstrapLists is not defined; skipping preload');
-}
+  if (typeof bootstrapLists === 'function') {
+    await bootstrapLists();
+  } else {
+    console.warn('bootstrapLists is not defined; skipping preload');
+  }
 
-// Age 初始 chips
-state.age_bin = [];
-renderAgeChips();
+  // Age 初始 chips
+  state.age_bin = [];
+  renderAgeChips();
 
-// Browse 區塊
-try { await initBrowse?.(); } catch(e){ console.warn('initBrowse failed:', e); }
+  // Browse 區塊
+  try { await initBrowse?.(); } catch(e){ console.warn('initBrowse failed:', e); }
 
-// STA chips 初始狀態
-$$('#sexChips .chip').forEach(x => x.classList.toggle('active', (x.dataset.sex ?? '') === ''));
-$$('#tumorChips .chip').forEach(x => x.classList.toggle('active', (x.dataset.tumor ?? '') === ''));
+  // STA chips 初始狀態
+  $$('#sexChips .chip').forEach(x => x.classList.toggle('active', (x.dataset.sex ?? '') === ''));
+  $$('#tumorChips .chip').forEach(x => x.classList.toggle('active', (x.dataset.tumor ?? '') === ''));
 
-updateSTASummary?.();
-HAS_SEARCHED = false;
-lastFetched = [];
-updatePanels?.();
+  updateSTASummary?.();
+  HAS_SEARCHED = false;
+  lastFetched = [];
+  updatePanels?.();
 })();
-
 
 // 首頁載入先把結果面板藏起來
 document.addEventListener('DOMContentLoaded', () => {
-const resultsPanel = document.getElementById('resultsPanel');
-const head = document.querySelector('.resultsHead');
-const cards = document.getElementById('cards');
+  const resultsPanel = document.getElementById('resultsPanel');
+  const head = document.querySelector('.resultsHead');
+  const cards = document.getElementById('cards');
 
-if (resultsPanel) resultsPanel.style.display = 'none';
-if (head) head.style.display = 'none';
-if (cards) cards.style.display = 'none';
+  if (resultsPanel) resultsPanel.style.display = 'none';
+  if (head) head.style.display = 'none';
+  if (cards) cards.style.display = 'none';
 
-try {
-  updatePanels();
-} catch (e) {
-  console.warn(e);
-}
+  try {
+    updatePanels();
+  } catch (e) {
+    console.warn(e);
+  }
 });
-
 
 // ===== helpers for infinite render =====
 // 懶載圖 + 併發限流（避免 429）
-const IMG_VIEWPORT = () => document.querySelector('#resultsPanel');
+// ✅ 只保留「視窗」為 viewport 的定義（刪掉舊的 #resultsPanel 版本）
+const IMG_VIEWPORT = () => null;
+
 const MAX_IMG_CONC = 6;
 let _imgInFlight = 0;
 const _imgQueue = [];
 
 // 圖片 IntersectionObserver：只在接近可視範圍時才排入下載
 const ioImg = new IntersectionObserver((entries) => {
-entries.forEach(e => {
-  if (!e.isIntersecting) return;
-  const img = e.target;
-  ioImg.unobserve(img);
-  _enqueueImgLoad(img);
-});
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const img = e.target;
+    ioImg.unobserve(img);
+    _enqueueImgLoad(img);
+  });
 }, { root: IMG_VIEWPORT(), rootMargin: '400px' });
 
 function attachLazy(imgEl, url){
-imgEl.loading = 'lazy';
-imgEl.decoding = 'async';
-imgEl.dataset.src = url;
-imgEl.src = svg('2D Image'); // 你的 placeholder
-ioImg.observe(imgEl);
+  imgEl.loading = 'lazy';
+  imgEl.decoding = 'async';
+  imgEl.dataset.src = url;
+  imgEl.src = svg('2D Image'); // 你的 placeholder
+  ioImg.observe(imgEl);
 }
 
 function _enqueueImgLoad(img){
-_imgQueue.push({ img, attempt: 0 });
-_pumpImgQueue();
+  _imgQueue.push({ img, attempt: 0 });
+  _pumpImgQueue();
 }
 
 function _pumpImgQueue(){
-while (_imgInFlight < MAX_IMG_CONC && _imgQueue.length){
-  const job = _imgQueue.shift();
-  _imgInFlight++;
-  _loadWithRetry(job.img, job.attempt).finally(() => {
-    _imgInFlight--;
-    _pumpImgQueue();
+  while (_imgInFlight < MAX_IMG_CONC && _imgQueue.length){
+    const job = _imgQueue.shift();
+    _imgInFlight++;
+    _loadWithRetry(job.img, job.attempt).finally(() => {
+      _imgInFlight--;
+      _pumpImgQueue();
+    });
+  }
+}
+
+function _loadWithRetry(img, attempt = 0) {
+  const url = img.dataset.src;
+  if (!url) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const tryFetch = () => {
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.blob();
+        })
+        .then((blob) => {
+          const objUrl = URL.createObjectURL(blob);
+          img.src = objUrl;          // 用本機 blob URL 當圖片來源
+          resolve();
+        })
+        .catch(() => {
+          if (attempt < 3) {
+            const wait = 500 * Math.pow(2, attempt); // 0.5s,1s,2s
+            setTimeout(
+              () => _loadWithRetry(img, attempt + 1).then(resolve),
+              wait
+            );
+          } else {
+            img.src = svg("2D Image"); // 連三次失敗就用預設圖
+            resolve();
+          }
+        });
+    };
+
+    tryFetch();
   });
 }
-}
 
-function _loadWithRetry(img, attempt = 0){
-const url = img.dataset.src;
-if (!url) return Promise.resolve();
-return new Promise((resolve) => {
-  const fail = () => {
-    if (attempt < 3){
-      const wait = 500 * Math.pow(2, attempt); // 0.5s,1s,2s
-      setTimeout(() => _loadWithRetry(img, attempt + 1).then(resolve), wait);
-    } else {
-      img.src = svg('2D Image');
-      resolve();
-    }
-  };
-  img.onerror = fail;
-  img.onload  = () => resolve();
-  img.src = url; // 真正發請求
-});
-}
 
 // 分批掛載（防止重複宣告）
-window.BATCH    = window.BATCH    ?? 60;   // 每批幾張卡
+window.BATCH     = window.BATCH     ?? 60;  // 每批幾張卡
 window._mountIdx = window._mountIdx ?? 0;
 window._infIO    = window._infIO    ?? null;
 
-
 function _fallbackCard(item){
-const el = document.createElement('article');
-el.className = 'card';
-el.innerHTML = `
-  <img class="thumb" alt="">
-  <div class="body">
-    <div class="titleRow">
-      <a href="javascript:void(0)" class="caseLink">${String(item.case_id || item.id || '')}</a>
-    </div>
-    <div class="keyRow">
-      <span class="kv"><span class="k">Sex</span><span class="v">${String(item.sex ?? '—')}</span></span>
-      <span class="kv"><span class="k">Age</span><span class="v">${Number.isFinite(item.age) ? item.age + 'y' : '—'}</span></span>
-      <span class="kv"><span class="tag ${item.tumor === 1 ? 'bad' : 'ok'}">${item.tumor === 1 ? 'Tumor' : 'No tumor'}</span></span>
-    </div>
-  </div>`;
-return el;
+  const el = document.createElement('article');
+  el.className = 'card';
+  el.innerHTML = `
+    <img class="thumb" alt="">
+    <div class="body">
+      <div class="titleRow">
+        <a href="javascript:void(0)" class="caseLink">${String(item.case_id || item.id || '')}</a>
+      </div>
+      <div class="keyRow">
+        <span class="kv"><span class="k">Sex</span><span class="v">${String(item.sex ?? '—')}</span></span>
+        <span class="kv"><span class="k">Age</span><span class="v">${Number.isFinite(item.age) ? item.age + 'y' : '—'}</span></span>
+        <span class="kv"><span class="tag ${item.tumor === 1 ? 'bad' : 'ok'}">${item.tumor === 1 ? 'Tumor' : 'No tumor'}</span></span>
+      </div>
+    </div>`;
+  return el;
 }
 
-async function _appendBatch(cards, items){
-const end = Math.min(_mountIdx + BATCH, items.length);
-const frag = document.createDocumentFragment();
-for (let i = _mountIdx; i < end; i++){
-  const it = items[i];
-  const el = (typeof makeCard === 'function') ? await makeCard(it)
-          : (typeof makeCardHTML === 'function') ? (() => {
-              const a = document.createElement('article');
-              a.className = 'card';
-              a.innerHTML = makeCardHTML(it);
-              return a;
-            })()
-          : _fallbackCard(it);
+// 允許指定本批掛多少張；不給就用原本的 BATCH
+function _appendBatch(cards, items, limit = BATCH){
+  const end = Math.min(_mountIdx + limit, items.length);
+  const frag = document.createDocumentFragment();
+  for (let i = _mountIdx; i < end; i++){
+    const it = items[i];
+    const el = (typeof makeCard === 'function') ? makeCard(it)
+            : (typeof makeCardHTML === 'function') ? (() => {
+                const a = document.createElement('article');
+                a.className = 'card';
+                a.innerHTML = makeCardHTML(it);
+                return a;
+              })()
+            : _fallbackCard(it);
 
-  // 懶載圖：尋找卡片中的 .thumb，掛上 attachLazy（不要直接設 src）
-  const img = el.querySelector('img.thumb');
-  if (img) {
-    const id = extractNumFromId(it.case_id || it.id);
-    attachLazy(img, await profileURL(id));
+    const img = el.querySelector('img.thumb');
+    if (img) {
+      const id = extractNumFromId(it.case_id || it.id);
+      attachLazy(img, profileURL(id));
+    }
+    frag.appendChild(el);
   }
-  frag.appendChild(el);
-}
-cards.appendChild(frag);
-_mountIdx = end;
+  cards.appendChild(frag);
+  _mountIdx = end;
 }
 
 function _setupInfinite(cards, items){
-// 清掉舊 sentinel
-const old = cards.querySelector('[data-sentinel]');
-if (old) old.remove();
+  // 清掉舊 sentinel
+  const old = cards.querySelector('[data-sentinel]');
+  if (old) old.remove();
 
-const sentinel = document.createElement('div');
-sentinel.setAttribute('data-sentinel', '1');
-sentinel.style.height = '1px';
-cards.appendChild(sentinel);
+  // 確保容器可做絕對定位參考
+  if (getComputedStyle(cards).position === 'static') {
+    cards.style.position = 'relative';
+  }
 
-if (_infIO) { _infIO.disconnect(); _infIO = null; }
-_infIO = new IntersectionObserver((entries) => {
-  entries.forEach(async (e) => {
-    if (!e.isIntersecting) return;
-    if (_mountIdx < items.length) {
-      await _appendBatch(cards, items);
-    } else {
-      _infIO.disconnect();
-    }
+  const sentinel = document.createElement('div');
+  sentinel.setAttribute('data-sentinel', '1');
+
+  // ✅ 用絕對定位，完全不佔 CSS Grid 的格子
+  Object.assign(sentinel.style, {
+    position: 'absolute',
+    left: '0',
+    bottom: '0',
+    width: '1px',
+    height: '1px',
+    overflow: 'hidden',
+    pointerEvents: 'none',
+    // 下面兩行只是保險，確保它不影響排版
+    transform: 'translateZ(0)',
+    contain: 'layout style'
   });
-}, { root: IMG_VIEWPORT(), rootMargin: '800px' });
+  cards.appendChild(sentinel);
 
-_infIO.observe(sentinel);
+  // 重新掛 observer
+  if (_infIO) { try { _infIO.disconnect(); } catch(e){} }
+  _infIO = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+
+      let loops = 0, MAX_LOOPS = 5;
+      const nearBottom = () => sentinel.getBoundingClientRect().top < (innerHeight + 1200);
+
+      while (_mountIdx < items.length && nearBottom() && loops < MAX_LOOPS) {
+        _appendBatch(cards, items);
+        loops++;
+      }
+      if (_mountIdx < items.length && nearBottom()) {
+        requestAnimationFrame(() => { _infIO.unobserve(sentinel); _infIO.observe(sentinel); });
+      }
+      if (_mountIdx >= items.length) _infIO.disconnect();
+    });
+  }, { root: null, rootMargin: '1200px', threshold: 0 });
+
+  _infIO.observe(sentinel);
 }
 
-async function _startInfiniteRender(cards, items){
-cards.innerHTML = '';
-_mountIdx = 0;
-await _appendBatch(cards, items);     // 先掛第一批
-_setupInfinite(cards, items);   // 滾到接近底部再補
+
+function _startInfiniteRender(cards, items){
+  // 清空並重置游標
+  cards.innerHTML = '';
+  _mountIdx = 0;
+
+  // 起手先掛兩批（大約 120 張），畫面不空
+  _appendBatch(cards, items); // 第 1 批
+  _appendBatch(cards, items); // 第 2 批
+
+  // 啟動無限捲動：sentinel 近視窗底時繼續補批
+  _setupInfinite(cards, items);
+
+  // 若內容高度太短，主動補到 sentinel 推出視窗底緣（避免卡在 120）
+  setTimeout(() => {
+    const sentinel = cards.querySelector('[data-sentinel]');
+    if (!sentinel) return;
+    while (sentinel.getBoundingClientRect().bottom < window.innerHeight + 200 &&
+           _mountIdx < items.length) {
+      _appendBatch(cards, items);
+    }
+  }, 0);
 }
+
+
 // ===== end helpers =====
 
+function renderAfterFetch(items = []) {
+  const cardsEl = document.getElementById('cards');
+  const resultsPanel = document.getElementById('resultsPanel');
+  const head = document.querySelector('.resultsHead');
+  const recBar = document.querySelector('#recBar');
+  if (!cardsEl) return;
 
-async function renderAfterFetch(items = []) {
-const cardsEl = document.getElementById('cards');
-const resultsPanel = document.getElementById('resultsPanel');
-const head = document.querySelector('.resultsHead');
-const recBar = document.querySelector('#recBar');
-if (!cardsEl) return;
+  const list = Array.isArray(items) ? items : [];
+  window.lastFetched = list;
+  const n = list.length;
 
-const list = Array.isArray(items) ? items : [];
-window.lastFetched = list;
-const n = list.length;
+  // 0 筆：結果標題與面板保留，卡片隱藏，Browse 顯示
+  if (n === 0) {
+    const total = 0;
+    if (typeof setResultsCount === 'function') setResultsCount(total);
+    else {
+      const counterEl = document.getElementById('counter') || document.querySelector('.counter');
+      if (counterEl) counterEl.textContent = 'Results: 0 cases';
+    }
 
-// 0 筆：結果標題與面板保留，卡片隱藏，Browse 顯示
-if (n === 0) {
-  // 統一更新「Results: 0 cases」
-  const total = 0;
+    head && (head.style.display = '');
+    resultsPanel && (resultsPanel.style.display = '');
+    if (cardsEl) { cardsEl.style.display = 'none'; cardsEl.innerHTML = ''; }
+    recBar && recBar.style.removeProperty('display');
+    return;
+  }
+
+  // 有結果：正常顯示
+  recBar && (recBar.style.display = 'none');
+  head && (head.style.display = '');
+  resultsPanel && (resultsPanel.style.display = '');
+  cardsEl.style.display = '';
+
+  const total = Number(window.LAST_TOTAL ?? n) || n;
   if (typeof setResultsCount === 'function') setResultsCount(total);
   else {
     const counterEl = document.getElementById('counter') || document.querySelector('.counter');
-    if (counterEl) counterEl.textContent = 'Results: 0 cases';
+    if (counterEl) counterEl.textContent = `Results: ${total} ${total === 1 ? 'case' : 'cases'}`;
   }
 
-  head && (head.style.display = '');         // 保留標題
-  resultsPanel && (resultsPanel.style.display = ''); // 保留右側容器
-  if (cardsEl) { cardsEl.style.display = 'none'; cardsEl.innerHTML = ''; }
+  cardsEl.classList.toggle('centerOne', n === 1);
+  head?.classList.toggle('single', n === 1);
+  resultsPanel?.classList.toggle('single', n === 1);
 
-  recBar && recBar.style.removeProperty('display'); // 顯示 Browse
-  return;
+  const sorted = (typeof sorter === 'function') ? sorter(list.slice()) : list.slice();
+  _startInfiniteRender(cardsEl, sorted);
+
+  const sortSel = document.getElementById('sortBy');
+  if (sortSel) {
+    const disabled = n < 2;
+    sortSel.disabled = disabled;
+    sortSel.parentElement?.classList?.toggle('disabled', disabled);
+  }
 }
-
-// 有結果：正常顯示
-recBar && (recBar.style.display = 'none');
-head && (head.style.display = '');
-resultsPanel && (resultsPanel.style.display = '');
-cardsEl.style.display = '';
-
-const total = Number(window.LAST_TOTAL ?? n) || n;
-if (typeof setResultsCount === 'function') setResultsCount(total);
-else {
-  const counterEl = document.getElementById('counter') || document.querySelector('.counter');
-  if (counterEl) counterEl.textContent = `Results: ${total} ${total === 1 ? 'case' : 'cases'}`;
-}
-
-cardsEl.classList.toggle('centerOne', n === 1);
-head?.classList.toggle('single', n === 1);
-resultsPanel?.classList.toggle('single', n === 1);
-
-const sorted = (typeof sorter === 'function') ? sorter(list.slice()) : list.slice();
-await _startInfiniteRender(cardsEl, sorted);
-
-const sortSel = document.getElementById('sortBy');
-if (sortSel) {
-  const disabled = n < 2;
-  sortSel.disabled = disabled;
-  sortSel.parentElement?.classList?.toggle('disabled', disabled);
-}
-}
-
-
 
 // 防止拖移造成選取
 ['#recPrev', '#recNext', '#recPlay'].forEach(sel => {
-const btn = document.querySelector(sel);
-if (btn) btn.addEventListener('mousedown', e => e.preventDefault());
+  const btn = document.querySelector(sel);
+  if (btn) btn.addEventListener('mousedown', e => e.preventDefault());
 });
 
+   
 
 </script>
+
+<script>
+document.getElementById('homeBtn')?.addEventListener('click', () => {
+  // ✅ 回到首頁（重新載入整個畫面）
+  location.reload();
+});
+(() => {
+  const qInput = document.getElementById('q');
+  const clearBtn = document.getElementById('clearBtn');
+  if (!qInput || !clearBtn) return; // 保護機制，防止報錯
+
+  clearBtn.addEventListener('click', () => {
+    qInput.value = '';
+    qInput.focus();
+
+    // 若希望清除時回首頁 (可選)
+    window.HAS_SEARCHED = false;
+    if (typeof loadRandom === 'function') loadRandom();
+  });
+})();
+</script>
+
+
 </body>
 
 </html>
