@@ -26,6 +26,8 @@ def create_app():
     create_session_dir()
     app = Flask(__name__)
     app.register_blueprint(api_blueprint, url_prefix=f'{Constants.BASE_PATH}/api')
+    
+    app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2 GB, for overcoming size limits in file uploads
 
     class FilterProgressRequests(logging.Filter):
         def filter(self, record):
