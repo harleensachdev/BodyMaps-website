@@ -13,8 +13,8 @@ const UploadPage: React.FC<UploadPageProps> = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [, setMessage] = useState<string>("");
-  const [, setInferenceStarted] = useState(false);
-  const [, setZipFilename] = useState<string | null>(null);
+  // const [, setInferenceStarted] = useState(false);
+  // const [, setZipFilename] = useState<string | null>(null);
 
   const allowedExtensions = [".nii", ".nii.gz"];
 
@@ -42,33 +42,57 @@ const UploadPage: React.FC<UploadPageProps> = () => {
   };
 
   // Step 0: Upload files to server
+  const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB per chunk
+
   const handleUploadClick = async () => {
-    if (selectedFiles.length === 0) {
-      alert("No files selected!");
-      return;
-    }
+    if (selectedFiles.length === 0) return alert("No files selected!");
 
-    setMessage("Uploading files...");
+    const file = selectedFiles[0];
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const sessionId = crypto.randomUUID(); // generate unique session ID
+
+    setMessage(`Uploading ${file.name} in ${totalChunks} chunks...`);
+
     try {
-      const formData = new FormData();
-      selectedFiles.forEach(f => formData.append("files", f));
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
 
-      const res = await fetch(`${API_BASE}/api/upload-inference`, {
+        const formData = new FormData();
+        formData.append("session_id", sessionId);
+        formData.append("chunk_index", i.toString());
+        formData.append("total_chunks", totalChunks.toString());
+        formData.append("file", chunk);
+
+        const res = await fetch(`${API_BASE}/api/upload-inference-chunk`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Chunk upload failed");
+      }
+
+      setMessage("All chunks uploaded, combining...");
+
+      // Combine chunks on the backend
+      const finalizeRes = await fetch(`${API_BASE}/api/finalize-upload`, {
         method: "POST",
-        body: formData,
+        body: new URLSearchParams({
+          session_id: sessionId,
+          total_chunks: totalChunks.toString(),
+          output_filename: file.name,
+        }),
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`Upload successful: ${data.status}`);
-        setInferenceStarted(false);
-        setZipFilename(null);
-      } else {
-        setMessage(`Upload failed: ${data.error || "Unknown error"}`);
-      }
+      const finalizeData = await finalizeRes.json();
+      if (!finalizeRes.ok) throw new Error(finalizeData.error);
+
+      setMessage(`Upload complete! File ready at ${finalizeData.path}`);
     } catch (err) {
       console.error(err);
-      setMessage("Upload failed: network error");
+      setMessage("Upload failed: " + (err as Error).message);
     }
   };
 

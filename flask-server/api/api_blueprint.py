@@ -492,43 +492,76 @@ def get_result(session_id):
 
 #### INFERENCE ENDPOINTS ####
 
-@api_blueprint.route('/upload-inference', methods=['POST'])
-def upload_inference():
-    try:
-        # Get SESSION_ID from the form (optional: generate one if not provided)
-        session_id = request.form.get('SESSION_ID')
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            print(f"[Upload-Inference] No SESSION_ID provided. Generated: {session_id}")
+CHUNK_DIR = "/tmp/uploads"  # Temporary folder for chunked uploads
+os.makedirs(CHUNK_DIR, exist_ok=True)
 
-        # Base folder for inference uploads
+@api_blueprint.route("/upload-inference-chunk", methods=["POST"])
+def upload_inference_chunk():
+    """
+    Receives a chunk of a file.
+    Expects:
+        - session_id
+        - chunk_index
+        - total_chunks
+        - file (the chunk itself)
+    """
+    try:
+        session_id = request.form.get("session_id")
+        chunk_index = request.form.get("chunk_index")
+        total_chunks = request.form.get("total_chunks")
+        chunk_file = request.files.get("file")
+
+        if not all([session_id, chunk_index, total_chunks, chunk_file]):
+            return jsonify({"error": "Missing parameters"}), 400
+
+        session_folder = os.path.join(CHUNK_DIR, session_id)
+        os.makedirs(session_folder, exist_ok=True)
+
+        chunk_path = os.path.join(session_folder, f"chunk-{chunk_index}")
+        chunk_file.save(chunk_path)
+
+        return jsonify({"status": "ok", "chunk_index": chunk_index})
+    except Exception as e:
+        print(f"❌ Chunk upload error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_blueprint.route("/finalize-upload", methods=["POST"])
+def finalize_upload():
+    """
+    Combines all chunks into the final file in the proper sessions folder.
+    Expects:
+        - session_id
+        - total_chunks
+        - output_filename (optional)
+    """
+    try:
+        session_id = request.form.get("session_id")
+        total_chunks = int(request.form.get("total_chunks"))
+        output_filename = request.form.get("output_filename", "inference_input.gz")
+
+        # New base path: sessions/inference/<session_id>/
         base_path = os.path.join(Constants.SESSIONS_DIR_NAME, "inference", session_id)
         os.makedirs(base_path, exist_ok=True)
-        print(f"[Upload-Inference] Created folder: {base_path}")
+        final_path = os.path.join(base_path, output_filename)
 
-        # Get files from the request
-        files_dict = request.files
-        if not files_dict:
-            return jsonify({"error": "No files uploaded"}), 400
+        # Combine chunks
+        temp_folder = os.path.join("/tmp/uploads", session_id)
+        with open(final_path, "wb") as out_file:
+            for i in range(total_chunks):
+                chunk_path = os.path.join(temp_folder, f"chunk-{i}")
+                with open(chunk_path, "rb") as f:
+                    out_file.write(f.read())
 
-        filenames = list(files_dict)
-        saved_files = []
-        for f in files_dict.values():
-            file_path = os.path.join(base_path, f.filename)
-            f.save(file_path)
-            saved_files.append(f.filename)
-            print(f"[Upload-Inference] Saved file: {file_path}")
+        # Optional: clean up temp chunks
+        for i in range(total_chunks):
+            os.remove(os.path.join(temp_folder, f"chunk-{i}"))
+        os.rmdir(temp_folder)
 
-        # Respond with session ID + list of uploaded files
-        return jsonify({
-            "status": "uploaded",
-            "session_id": session_id,
-            "files": saved_files
-        }), 200
-
+        return jsonify({"status": "combined", "path": final_path})
     except Exception as e:
-        print(f"[Upload-Inference Error] {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        print(f"❌ Finalize upload error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 ## OTHER ENDPOINTS ##
 
