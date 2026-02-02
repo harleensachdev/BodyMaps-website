@@ -489,6 +489,49 @@ def get_result(session_id):
 #    progress_tracker.pop(session_id, None)
 #    return jsonify({"message": "Progress End"}), 200
 
+
+#### INFERENCE ENDPOINTS ####
+
+@api_blueprint.route('/upload-inference', methods=['POST'])
+def upload_inference():
+    try:
+        # Get SESSION_ID from the form (optional: generate one if not provided)
+        session_id = request.form.get('SESSION_ID')
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            print(f"[Upload-Inference] No SESSION_ID provided. Generated: {session_id}")
+
+        # Base folder for inference uploads
+        base_path = os.path.join(Constants.SESSIONS_DIR_NAME, "inference", session_id)
+        os.makedirs(base_path, exist_ok=True)
+        print(f"[Upload-Inference] Created folder: {base_path}")
+
+        # Get files from the request
+        files_dict = request.files
+        if not files_dict:
+            return jsonify({"error": "No files uploaded"}), 400
+
+        filenames = list(files_dict)
+        saved_files = []
+        for f in files_dict.values():
+            file_path = os.path.join(base_path, f.filename)
+            f.save(file_path)
+            saved_files.append(f.filename)
+            print(f"[Upload-Inference] Saved file: {file_path}")
+
+        # Respond with session ID + list of uploaded files
+        return jsonify({
+            "status": "uploaded",
+            "session_id": session_id,
+            "files": saved_files
+        }), 200
+
+    except Exception as e:
+        print(f"[Upload-Inference Error] {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+## OTHER ENDPOINTS ##
+
 @api_blueprint.route('/ping', methods=['GET'])
 def ping():
     return jsonify({"message": "pong"}), 200

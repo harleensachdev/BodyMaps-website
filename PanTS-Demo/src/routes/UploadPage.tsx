@@ -52,9 +52,11 @@ const UploadPage: React.FC<UploadPageProps> = () => {
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append("files", f));
 
-      const res = await fetch("/upload-files", {
+      const API_BASE = import.meta.env.VITE_API_BASE;
+
+      const res = await fetch(`${API_BASE}/api/upload-inference`, {
         method: "POST",
-        body: formData
+        body: formData,
       });
 
       const data = await res.json();
@@ -186,22 +188,6 @@ const UploadPage: React.FC<UploadPageProps> = () => {
           <IconArrowUp />
         </button>
       </div>
-
-      {/* Action buttons */}
-      <div className="action-buttons">
-        <button onClick={handleRunInference} disabled={selectedFiles.length === 0}>
-          Run Inference
-        </button>
-        <button onClick={handlePrepareDownload} disabled={!inferenceStarted}>
-          Prepare Download
-        </button>
-        <button onClick={handleDownload} disabled={!zipFilename}>
-          <IconDownload /> Download
-        </button>
-      </div>
-
-      {/* Status message */}
-      {message && <div className="status-message">{message}</div>}
     </div>
   );
 };

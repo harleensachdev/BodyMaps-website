@@ -39,6 +39,7 @@ def create_app():
 
 
 app = create_app()
+print(app.url_map)
 
 # ✅ SharedArrayBuffer Compatibility
 @app.after_request
