@@ -2,6 +2,7 @@ from flask import Blueprint, send_file, make_response, request, jsonify, Respons
 from services.nifti_processor import NiftiProcessor
 from services.session_manager import SessionManager, generate_uuid
 from services.auto_segmentor import run_auto_segmentation
+from services.inference_job_queue import InferenceJobQueue
 from models.application_session import ApplicationSession
 from models.combined_labels import CombinedLabels
 from models.base import db
@@ -33,6 +34,63 @@ api_blueprint = Blueprint("api", __name__)
 last_session_check = datetime.now()
 
 progress_tracker = {}  # {session_id: (start_time, expected_total_seconds)}
+
+INFERENCE_QUEUE_DIR = os.getenv(
+    "INFERENCE_QUEUE_DIR",
+    os.path.join(Constants.SESSIONS_DIR_NAME, "inference_queue"),
+)
+inference_job_queue = InferenceJobQueue(INFERENCE_QUEUE_DIR)
+
+
+def _worker_api_token():
+    return (os.getenv("WORKER_API_TOKEN", "") or "").strip()
+
+
+def _get_worker_id():
+    return (
+        request.headers.get("X-Worker-Id")
+        or request.args.get("worker_id")
+        or (request.get_json(silent=True) or {}).get("worker_id")
+        or "worker-unknown"
+    )
+
+
+def _require_worker_auth():
+    expected = _worker_api_token()
+    if not expected:
+        return jsonify({"error": "WORKER_API_TOKEN is not configured on server"}), 500
+
+    provided = (request.headers.get("X-Worker-Token", "") or "").strip()
+    if provided != expected:
+        return jsonify({"error": "Unauthorized worker token"}), 401
+    return None
+
+
+def _api_prefix_path() -> str:
+    base_path = (Constants.BASE_PATH or "/").rstrip("/")
+    return f"{base_path}/api" if base_path else "/api"
+
+
+def _absolute_api_url(path_suffix: str) -> str:
+    root = request.url_root.rstrip("/")
+    return f"{root}{_api_prefix_path()}{path_suffix}"
+
+
+def _public_job_payload(job: dict) -> dict:
+    response = {
+        "job_id": job.get("job_id"),
+        "session_id": job.get("session_id"),
+        "model": job.get("model"),
+        "status": job.get("status"),
+        "attempts": job.get("attempts"),
+        "max_attempts": job.get("max_attempts"),
+        "error": job.get("error"),
+        "created_at": job.get("created_at"),
+        "updated_at": job.get("updated_at"),
+    }
+    if job.get("status") == "succeeded":
+        response["download_url"] = _absolute_api_url(f"/jobs/{job.get('job_id')}/download")
+    return response
 
 
 @api_blueprint.route("/proxy-image")
@@ -596,6 +654,211 @@ def check_inference_status_legacy():
     if not session_id:
         return jsonify({"error": "session_id is required"}), 400
     return get_inference_status(session_id)
+
+
+@api_blueprint.route('/jobs', methods=['POST'])
+def create_pull_inference_job():
+    payload = request.get_json(silent=True) or {}
+
+    def _pick_text(*keys):
+        for key in keys:
+            value = request.form.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        for key in keys:
+            value = payload.get(key) if isinstance(payload, dict) else None
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    session_id = _pick_text("session_id", "SESSION_ID", "sessionId") or str(uuid.uuid4())
+    input_server_path = _pick_text("input_server_path", "INPUT_SERVER_PATH", "path")
+    uploaded_filename = _pick_text("uploaded_filename", "output_filename", "filename")
+    model = _pick_text("model", "MODEL_NAME") or "ePAI"
+
+    ct_file = (
+        request.files.get('MAIN_NIFTI')
+        or request.files.get('file')
+        or request.files.get('ct')
+        or request.files.get('ct_file')
+    )
+
+    if not input_server_path and uploaded_filename:
+        candidate = os.path.join(Constants.SESSIONS_DIR_NAME, "inference", session_id, uploaded_filename)
+        if os.path.exists(candidate):
+            input_server_path = candidate
+
+    if ct_file is not None and not input_server_path:
+        target_dir = os.path.join(Constants.SESSIONS_DIR_NAME, "inference", session_id, "input")
+        os.makedirs(target_dir, exist_ok=True)
+        original_name = os.path.basename(ct_file.filename or "ct.nii.gz")
+        target_name = original_name if original_name else "ct.nii.gz"
+        input_server_path = os.path.join(target_dir, target_name)
+        ct_file.save(input_server_path)
+
+    if not input_server_path:
+        return jsonify({"error": "No input provided. Send input_server_path, uploaded_filename, or MAIN_NIFTI."}), 400
+    if not os.path.exists(input_server_path):
+        return jsonify({"error": f"Input path not found: {input_server_path}"}), 400
+
+    job = inference_job_queue.create_job(
+        input_file_path=input_server_path,
+        session_id=session_id,
+        model=model,
+        max_attempts=int(os.getenv("INFERENCE_MAX_ATTEMPTS", "3")),
+    )
+    return jsonify(_public_job_payload(job)), 201
+
+
+@api_blueprint.route('/jobs/<job_id>', methods=['GET'])
+def get_pull_inference_job(job_id):
+    job = inference_job_queue.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found", "job_id": job_id}), 404
+    return jsonify(_public_job_payload(job)), 200
+
+
+@api_blueprint.route('/jobs/next', methods=['GET'])
+def lease_next_pull_job():
+    auth_error = _require_worker_auth()
+    if auth_error is not None:
+        return auth_error
+
+    worker_id = _get_worker_id()
+    lease_seconds = int(request.args.get("lease_seconds") or os.getenv("INFERENCE_LEASE_SECONDS", "900"))
+    job = inference_job_queue.lease_next_job(worker_id=worker_id, lease_seconds=lease_seconds)
+    if not job:
+        return ("", 204)
+
+    job_id = job.get("job_id")
+    return jsonify({
+        "job_id": job_id,
+        "session_id": job.get("session_id"),
+        "model": job.get("model"),
+        "lease_seconds": lease_seconds,
+        "input_download_url": _absolute_api_url(f"/jobs/{job_id}/input"),
+        "heartbeat_url": _absolute_api_url(f"/jobs/{job_id}/heartbeat"),
+        "result_upload_url": _absolute_api_url(f"/jobs/{job_id}/result"),
+        "fail_url": _absolute_api_url(f"/jobs/{job_id}/fail"),
+        "status_url": _absolute_api_url(f"/jobs/{job_id}"),
+    }), 200
+
+
+@api_blueprint.route('/jobs/<job_id>/input', methods=['GET'])
+def download_pull_job_input(job_id):
+    auth_error = _require_worker_auth()
+    if auth_error is not None:
+        return auth_error
+
+    job = inference_job_queue.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found", "job_id": job_id}), 404
+
+    input_path = job.get("input_file_path")
+    if not input_path or not os.path.exists(input_path):
+        return jsonify({"error": "Input file missing for job", "job_id": job_id}), 404
+
+    return send_file(input_path, as_attachment=True, download_name=os.path.basename(input_path))
+
+
+@api_blueprint.route('/jobs/<job_id>/heartbeat', methods=['POST'])
+def heartbeat_pull_job(job_id):
+    auth_error = _require_worker_auth()
+    if auth_error is not None:
+        return auth_error
+
+    worker_id = _get_worker_id()
+    payload = request.get_json(silent=True) or {}
+    lease_seconds = int(payload.get("lease_seconds") or request.form.get("lease_seconds") or os.getenv("INFERENCE_LEASE_SECONDS", "900"))
+
+    try:
+        job = inference_job_queue.heartbeat(job_id=job_id, worker_id=worker_id, lease_seconds=lease_seconds)
+        if not job:
+            return jsonify({"error": "Job not found", "job_id": job_id}), 404
+        return jsonify(_public_job_payload(job)), 200
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@api_blueprint.route('/jobs/<job_id>/result', methods=['POST'])
+def complete_pull_job(job_id):
+    auth_error = _require_worker_auth()
+    if auth_error is not None:
+        return auth_error
+
+    worker_id = _get_worker_id()
+    prediction_file = (
+        request.files.get("prediction")
+        or request.files.get("mask")
+        or request.files.get("combined_labels")
+        or request.files.get("file")
+    )
+    output_csv = request.files.get("output_csv") or request.files.get("csv")
+
+    if prediction_file is None:
+        return jsonify({"error": "Missing prediction file (use field: prediction)"}), 400
+
+    temp_dir = os.path.join("/tmp", "pull_job_results", job_id)
+    os.makedirs(temp_dir, exist_ok=True)
+
+    pred_path = os.path.join(temp_dir, "combined_labels.nii.gz")
+    prediction_file.save(pred_path)
+
+    csv_path = None
+    if output_csv is not None:
+        csv_path = os.path.join(temp_dir, "output.csv")
+        output_csv.save(csv_path)
+
+    try:
+        job = inference_job_queue.complete_job(
+            job_id=job_id,
+            worker_id=worker_id,
+            result_mask_path=pred_path,
+            result_csv_path=csv_path,
+        )
+        if not job:
+            return jsonify({"error": "Job not found", "job_id": job_id}), 404
+        return jsonify(_public_job_payload(job)), 200
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@api_blueprint.route('/jobs/<job_id>/fail', methods=['POST'])
+def fail_pull_job(job_id):
+    auth_error = _require_worker_auth()
+    if auth_error is not None:
+        return auth_error
+
+    worker_id = _get_worker_id()
+    payload = request.get_json(silent=True) or {}
+    error_message = payload.get("error") or request.form.get("error") or "Worker marked job failed"
+
+    try:
+        job = inference_job_queue.fail_job(job_id=job_id, worker_id=worker_id, error=error_message)
+        if not job:
+            return jsonify({"error": "Job not found", "job_id": job_id}), 404
+        return jsonify(_public_job_payload(job)), 200
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+
+
+@api_blueprint.route('/jobs/<job_id>/download', methods=['GET'])
+def download_pull_job_result(job_id):
+    job = inference_job_queue.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found", "job_id": job_id}), 404
+    if job.get("status") != "succeeded":
+        return jsonify({"error": "Result not ready", "status": job.get("status")}), 409
+
+    zip_path = job.get("result_zip_path")
+    if not zip_path or not os.path.exists(zip_path):
+        return jsonify({"error": "Result archive missing"}), 404
+
+    return send_file(zip_path, as_attachment=True, download_name=f"{job_id}_auto_masks.zip")
 
 
 

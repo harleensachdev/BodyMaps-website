@@ -8,7 +8,15 @@ import type {
 	Systems
 } from "../types";
 
-export const API_BASE = import.meta.env.VITE_API_BASE;
+const configuredApiBase = String(import.meta.env.VITE_API_BASE || "").trim();
+const hasWindow = typeof window !== "undefined";
+const browserHost = hasWindow ? window.location.hostname : "";
+const isBrowserLocalhost = browserHost === "localhost" || browserHost === "127.0.0.1";
+const apiBaseLooksLocalhost = /https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredApiBase);
+
+export const API_BASE = configuredApiBase
+	? (apiBaseLooksLocalhost && !isBrowserLocalhost ? "" : configuredApiBase.replace(/\/$/, ""))
+	: "";
 
 // old
 // const x = {
