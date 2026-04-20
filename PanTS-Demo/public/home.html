@@ -2155,7 +2155,10 @@ section#recBar {           /* ⭐ 把 Browse 也拉進來一起對齊 */
 let apiUrl;
 if (location.hostname === "localhost") {
   apiUrl = "http://localhost:5001";
-} else {
+} else if (location.hostname==="www.pantsview.com") {
+  apiUrl = "https://api.pantsview.com";
+}
+else {
   apiUrl = "https://bodymaps.wse.jhu.edu/";
 }
 // 顯示「Results: …」/ 設定總數
@@ -2198,8 +2201,8 @@ function profileURL(idNum){
   const raw = `https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/profile_only/PanTS_${p}/profile.jpg`;
 
   // 走 proxy 來避免 COEP 擋
-  return raw;
-  // return apiUrl + `/api/proxy-image?url=${encodeURIComponent(raw)}`;
+  // return raw;
+  return apiUrl + `/api/proxy-image?url=${encodeURIComponent(raw)}`;
 }
 
 function extractNumFromId(idStr){
