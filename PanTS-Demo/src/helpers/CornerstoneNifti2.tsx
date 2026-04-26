@@ -241,18 +241,15 @@ export function setToolGroupOpacity(opacityValue: number) {
     }
 }
 
-export function toggleCrosshairTool(value: boolean) {
+export function toggleCrosshairTool(enable: boolean) {
   const toolGroup = ToolGroupManager.getToolGroup(toolGroupId);
   if (!toolGroup) return;
-  if (!value) {
+  if (enable) {
     toolGroup.setToolActive(CrosshairsTool.toolName, {
       bindings: [{ mouseButton: csToolsEnums.MouseBindings.Primary }],
     });
-
     toolGroup.setToolDisabled(PanTool.toolName);
-    return;
-  }
-  if (value) {
+  } else {
     toolGroup.setToolDisabled(CrosshairsTool.toolName);
     toolGroup.setToolActive(PanTool.toolName, {
       bindings: [{ mouseButton: csToolsEnums.MouseBindings.Primary }],

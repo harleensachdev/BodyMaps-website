@@ -83,7 +83,7 @@ function VisualizationPage() {
 	);
 	const [zoomMode, setZoomMode] = useState(false);
 	const [zoomLevel, setZoomLevel] = useState(1);
-	const [crosshairToolActive, setCrosshairToolActive] = useState(false);
+	const [crosshairToolActive, setCrosshairToolActive] = useState(true);
 
 	// const location = useLocation();
 
@@ -151,6 +151,7 @@ function VisualizationPage() {
 			setRenderingEngine(renderingEngine);
 			setViewportIds(viewportIds);
 			setVolumeId(volumeId);
+			toggleCrosshairTool(true);
 
 			const { nv, cmapCopy } = await create3DVolume(
 				render_ref,
@@ -354,8 +355,6 @@ function VisualizationPage() {
 													handleOpacityOnSliderChange
 												}
 												handleOpacityOnFormSubmit={handleOpacityOnFormSubmit}
-												setShowOrganDetails={setShowOrganDetails}
-												setShowTaskDetails={setShowTaskDetails}
 											/>
 
 											<WindowingSlider

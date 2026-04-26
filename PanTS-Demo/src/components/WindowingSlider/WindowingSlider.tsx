@@ -31,61 +31,60 @@ export default function WindowingSlider({ windowWidth, windowCenter, onWindowCha
 
   const handleCenterSubmit = (e: React.ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
-    let v = centerInput *-1;
+    let v = centerInput;
     if (!isNaN(v)) {
       v = Math.min(Math.max(v, -1000), 1000);
       onWindowChange(null, v);
     }
   };
   return (
-    <div className="windowing-slider w-full flex flex-col gap-2 border-2 rounded-sm bg-gray-900 shadow-md">
-      <div className="bg-gray-600 w-full h-8 flex items-center justify-center text-center rounded-t-sm text-white">Brightness/Contrast</div>
-      <div className="pl-4 pr-4 pb-2">
+    <div className="windowing-slider w-full flex flex-col gap-3">
 
-      <div className="flex gap-0.5 flex-col w-full justify-center items-center">
+      <div className="flex gap-1 flex-col w-full justify-center items-center">
         <div className="flex justify-between w-full items-center">
 
-        <label style={{ color: 'white' }}>Brightness</label>
-        <form onSubmit={handleCenterSubmit} className="w-1/3">
+        <label style={{ color: 'white' }}>Level</label>
+
+        <form onSubmit={handleCenterSubmit}  className="w-1/3">
           <input
-          type="number"
-          value={centerInput}
-          min="-1000"
-          max="1000"
-          onChange={handleCenterInputChange}
-          className="border text-white p-1 rounded-md w-full"
-          />
-          </form>
-        </div>
+            type="number"
+            value={centerInput}
+            onChange={handleCenterInputChange}
+            min="-1000"
+            max="1000"
+            className="text-white rounded-md p-1 border w-full"
+            />
+        </form>
+          </div>
         <input
           type="range"
           min="-1000"
           max="1000"
           step="1"
-          value={windowCenter*-1}
+          value={windowCenter}
           onChange={(e) => {
             const v = parseInt(e.target.value);
             setCenterInput(v);
-            onWindowChange(null, v*-1);
+            onWindowChange(null, v);
           }}
           className="w-full"
-          />
+        />
       </div>
-      <div className="flex gap-0.5 flex-col w-full justify-center items-center">
+      <div className="flex gap-2 flex-col w-full justify-center items-center">
         <div className="flex justify-between w-full items-center">
 
-        <label style={{ color: 'white' }}>Contrast</label>
+        <label style={{ color: 'white' }}>Window</label>
 
         <form onSubmit={handleWidthSubmit} className="w-1/3">
           <input
-          type="number"
-          value={widthInput}
-          min="1"
-          max="200"
-          onChange={handleWidthInputChange}
+            type="number"
+            value={widthInput}
+            min="1"
+            max="200"
+            onChange={handleWidthInputChange}
           className="border text-white p-1 rounded-md w-full"
-          />
-          </form>
+            />
+        </form>
         </div>
         <input
           type="range"
@@ -99,8 +98,7 @@ export default function WindowingSlider({ windowWidth, windowCenter, onWindowCha
             onWindowChange(v, null);
           }}
           className="w-full"
-          />
-      </div>
+        />
       </div>
     </div>
   );
