@@ -70,6 +70,10 @@ def run_auto_segmentation(input_path, session_dir, model):
             )
         elif model == 'SuPreM':
             return _run_suprem_inference(input_path=input_path, session_dir=session_dir)
+        elif model == 'OpenVAE':
+            return _run_openvae_inference(input_path=input_path, session_dir=session_dir)
+        elif model == 'MedFormer':
+            return _run_medformer_inference(input_path=input_path, session_dir=session_dir)
         else:
             raise ValueError(f"Unknown model: {model}")
 
@@ -403,6 +407,158 @@ def _run_suprem_inference(input_path: str, session_dir: str) -> str:
         _remap_combined_labels(combined_label_path, _SUPREM_TO_VIEWER)
 
     return case_output
+
+
+def _run_openvae_inference(input_path: str, session_dir: str) -> str:
+    """
+    Run OpenVAE 3D reconstruction via sliding-window patch inference.
+
+    Output layout:
+        <session_dir>/openvae/reconstructed_ct.nii.gz
+    """
+    output_dir = os.path.join(session_dir, "openvae")
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "reconstructed_ct.nii.gz")
+
+    openvae_src = os.getenv("OPENVAE_SRC_PATH", "/home/visitor/openvae")
+    checkpoint = os.getenv("OPENVAE_CHECKPOINT_PATH",
+                           "/home/visitor/openvae/ckpt/OpenVAE-3D-4x-patch64-10K/autoencoder_best.pt")
+    conda_env = os.getenv("CONDA_ENV_OPENVAE", "openvae")
+    conda_exe = shutil.which("conda") or "/home/apps/anaconda3/condabin/conda"
+    selected_gpu = get_least_used_gpu()
+
+    inference_script = os.path.join(openvae_src, "test", "test_3dvae.py")
+
+    # Use fine-tuned OpenVAE weights if present; fall back to public MAISI checkpoint
+    use_maisi_fallback = not os.path.exists(checkpoint)
+    if use_maisi_fallback:
+        print(f"[INFO] OpenVAE checkpoint not found at {checkpoint}; using --maisi_ckpt (public MONAI MAISI autoencoder)")
+        ckpt_arg = "--maisi_ckpt"
+        patch_arg = "--patch_size 80 80 80"
+    else:
+        ckpt_arg = f"--checkpoint {shlex.quote(checkpoint)}"
+        patch_arg = "--patch_size 64 64 64"
+
+    full_cmd = (
+        f"CUDA_VISIBLE_DEVICES={shlex.quote(selected_gpu)} "
+        f"{shlex.quote(conda_exe)} run -n {shlex.quote(conda_env)} "
+        f"python {shlex.quote(inference_script)} "
+        f"--input {shlex.quote(os.path.abspath(input_path))} "
+        f"{ckpt_arg} "
+        f"--output {shlex.quote(output_path)} "
+        f"{patch_arg} "
+        f"--amp"
+    )
+    print(f"[INFO] Running OpenVAE inference\n{full_cmd}")
+    try:
+        subprocess.run(full_cmd, shell=True, executable="/bin/bash", check=True, cwd=openvae_src)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            f"OpenVAE inference failed\nCommand: {full_cmd}\nExit code: {e.returncode}"
+        ) from e
+
+    if not os.path.exists(output_path):
+        raise RuntimeError(f"OpenVAE output not found: {output_path}")
+
+    return output_dir
+
+
+def _combine_medformer_masks(raw_save_path: str, bdmap_id: str, output_path: str):
+    """
+    Combine MedFormer's per-organ binary masks into a single combined_labels.nii.gz
+    using the viewer's integer label scheme.
+    """
+    import glob
+    import nibabel as nib
+    import numpy as np
+
+    # MedFormer appends dataset/model_name to save_path; use glob to find predictions dir
+    pred_dirs = glob.glob(os.path.join(raw_save_path, "**", bdmap_id, "predictions"), recursive=True)
+    if not pred_dirs:
+        raise RuntimeError(f"No predictions directory found under {raw_save_path}")
+
+    pred_dir = pred_dirs[0]
+    mask_files = glob.glob(os.path.join(pred_dir, "*.nii.gz"))
+    if not mask_files:
+        raise RuntimeError(f"No mask files found in {pred_dir}")
+
+    ref_img = nib.load(mask_files[0])
+    combined = np.zeros(ref_img.shape, dtype=np.uint8)
+
+    for mask_file in mask_files:
+        organ_name = os.path.basename(mask_file).replace(".nii.gz", "")
+        label_int = _VIEWER_LABELS.get(organ_name)
+        if label_int is None:
+            continue
+        mask_data = np.asarray(nib.load(mask_file).dataobj)
+        combined[mask_data > 0] = label_int
+
+    nib.save(nib.Nifti1Image(combined, ref_img.affine, ref_img.header), output_path)
+
+
+def _run_medformer_inference(input_path: str, session_dir: str) -> str:
+    """
+    Run MedFormer segmentation (26 abdominal structures + pancreatic lesion).
+    Outputs combined_labels.nii.gz mapped to the viewer's label scheme.
+    """
+    output_dir = os.path.join(session_dir, "medformer")
+    os.makedirs(output_dir, exist_ok=True)
+
+    rsuper_src = os.getenv("RSUPER_SRC_PATH", "/home/visitor/rsuper/rsuper_train")
+    checkpoint = os.getenv(
+        "MEDFORMER_CHECKPOINT_PATH",
+        "/home/visitor/rsuper/MedFormerPanTS/pants_pancreas_release/fold_0_latest.pth",
+    )
+    class_list = os.getenv(
+        "MEDFORMER_CLASS_LIST",
+        "/home/visitor/rsuper/MedFormerPanTS/labels_pants.yaml",
+    )
+    conda_env = os.getenv("CONDA_ENV_MEDFORMER", "rsuper")
+    conda_exe = shutil.which("conda") or "/home/apps/anaconda3/condabin/conda"
+    selected_gpu = get_least_used_gpu()
+
+    # MedFormer needs the filename to contain ".nii.gz" to enter the NIfTI branch;
+    # stage input as a flat BDMAP_00000001.nii.gz directly in the input dir
+    bdmap_id = "BDMAP_00000001"
+    staging_dir = os.path.join(output_dir, "input")
+    os.makedirs(staging_dir, exist_ok=True)
+    staged_ct = os.path.join(staging_dir, f"{bdmap_id}.nii.gz")
+    if not os.path.exists(staged_ct):
+        shutil.copy2(input_path, staged_ct)
+
+    raw_save_path = os.path.join(output_dir, "raw_output")
+    os.makedirs(raw_save_path, exist_ok=True)
+
+    inference_script = os.path.join(rsuper_src, "predict_abdomenatlas.py")
+    full_cmd = (
+        f"CUDA_VISIBLE_DEVICES={shlex.quote(selected_gpu)} "
+        f"{shlex.quote(conda_exe)} run -n {shlex.quote(conda_env)} "
+        f"python {shlex.quote(inference_script)} "
+        f"--load {shlex.quote(checkpoint)} "
+        f"--img_path {shlex.quote(os.path.join(output_dir, 'input'))} "
+        f"--class_list {shlex.quote(class_list)} "
+        f"--save_path {shlex.quote(raw_save_path)} "
+        f"--gpu {shlex.quote(selected_gpu)} "
+        f"--organ_mask_on_lesion"
+    )
+    print(f"[INFO] Running MedFormer inference\n{full_cmd}")
+    try:
+        subprocess.run(
+            full_cmd, shell=True, executable="/bin/bash", check=True, cwd=rsuper_src,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            f"MedFormer inference failed\nCommand: {full_cmd}\nExit code: {e.returncode}"
+        ) from e
+
+    combined_label_path = os.path.join(output_dir, "combined_labels.nii.gz")
+    _combine_medformer_masks(raw_save_path, bdmap_id, combined_label_path)
+
+    if not os.path.exists(combined_label_path):
+        raise RuntimeError(f"MedFormer combined_labels not created at {combined_label_path}")
+
+    return output_dir
 
 
 def _is_truthy(value: str) -> bool:

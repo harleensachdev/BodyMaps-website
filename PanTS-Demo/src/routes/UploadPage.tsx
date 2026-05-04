@@ -37,7 +37,7 @@ const UploadPage: React.FC<UploadPageProps> = () => {
   const [inferenceProgress, setInferenceProgress] = useState<number>(0);
   const [isInferencing, setIsInferencing] = useState<boolean>(false);
   const [inferenceCompleted, setInferenceCompleted] = useState<boolean>(false);
-  const [selectedModel, setSelectedModel] = useState<"ePAI" | "SuPreM">("ePAI");
+  const [selectedModel, setSelectedModel] = useState<"ePAI" | "SuPreM" | "OpenVAE" | "MedFormer" | "">("");
 
   const allowedExtensions = [".nii", ".nii.gz"];
 
@@ -302,6 +302,42 @@ const UploadPage: React.FC<UploadPageProps> = () => {
     }
   };
 
+  const handleRunEpaiOnReconstruction = async () => {
+    if (!sessionId) {
+      alert("No completed reconstruction session to run ePAI on.");
+      return;
+    }
+    const newSessionId = crypto.randomUUID();
+    setInferenceCompleted(false);
+    setInferenceProgress(0);
+    setMessage("Starting ePAI inference on reconstructed CT...");
+
+    const formData = new FormData();
+    formData.append("session_id", newSessionId);
+    formData.append("model_name", "ePAI");
+    formData.append("source_reconstruction_session_id", sessionId);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/run-epai-inference`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await parseApiResponse(res);
+      if (!res.ok) throw new Error(data.error || "Failed to start ePAI inference on reconstruction");
+
+      const sid = data.session_id || newSessionId;
+      setSessionId(sid);
+      setSelectedModel("ePAI");
+      setMessage(`ePAI inference started on reconstructed CT. Session: ${sid}`);
+      if (sid) {
+        startInferencePolling(sid);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage("Failed to start ePAI on reconstruction: " + (err as Error).message);
+    }
+  };
+
   // // Step 1: Run inference
   // const handleRunInference = async () => {
   //   setMessage("Running inference...");
@@ -438,18 +474,18 @@ const UploadPage: React.FC<UploadPageProps> = () => {
       </div>
 
       <div className="upload-actions">
-        <div className="model-selector">
-          {(["ePAI", "SuPreM"] as const).map(model => (
-            <button
-              key={model}
-              className={`model-button ${selectedModel === model ? "model-button--active" : ""}`}
-              onClick={() => setSelectedModel(model)}
-            >
-              {model}
-            </button>
-          ))}
-        </div>
-        <button className="upload-button" onClick={handleRunEpaiInference}>Run</button>
+        <select
+          className="model-select"
+          value={selectedModel}
+          onChange={(e) => setSelectedModel(e.target.value as "ePAI" | "SuPreM" | "OpenVAE" | "MedFormer" | "")}
+        >
+          <option value="" disabled>Select a model</option>
+          <option value="ePAI">ePAI</option>
+          <option value="SuPreM">SuPreM</option>
+          <option value="MedFormer">MedFormer</option>
+          <option value="OpenVAE">OpenVAE</option>
+        </select>
+        <button className="upload-button" onClick={handleRunEpaiInference} disabled={!selectedModel}>Run</button>
         <button className="upload-button" onClick={handleCheckStatus}>Check Status</button>
         <button className="upload-button" onClick={handleDownloadResult}>Download</button>
       </div>
@@ -474,12 +510,28 @@ const UploadPage: React.FC<UploadPageProps> = () => {
 
       {inferenceCompleted && sessionId && (
         <div className="result-actions">
-          <button className="upload-button result-button" onClick={() => navigate(`/session/${sessionId}`)}>
-            View Visualization
-          </button>
-          <button className="upload-button result-button" onClick={handleDownloadResult}>
-            Download Results
-          </button>
+          {selectedModel === "OpenVAE" ? (
+            <>
+              <button className="upload-button result-button" onClick={() => navigate(`/reconstruction/${sessionId}`)}>
+                View Reconstruction
+              </button>
+              <button className="upload-button result-button" onClick={handleRunEpaiOnReconstruction}>
+                Run ePAI on Result
+              </button>
+              <button className="upload-button result-button" onClick={handleDownloadResult}>
+                Download
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="upload-button result-button" onClick={() => navigate(`/session/${sessionId}`)}>
+                View Visualization
+              </button>
+              <button className="upload-button result-button" onClick={handleDownloadResult}>
+                Download Results
+              </button>
+            </>
+          )}
         </div>
       )}
 

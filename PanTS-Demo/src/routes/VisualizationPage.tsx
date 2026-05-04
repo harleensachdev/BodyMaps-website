@@ -37,13 +37,18 @@ function VisualizationPage() {
 	const params = useParams();
 	const pantsCase = params.caseId;
 	const sessionId = params.sessionId;
+	const reconstructionId = params.reconstructionId;
 
-	// Determine URLs — session inference results vs. HuggingFace dataset
-	const displayId = pantsCase ?? sessionId ?? "1";
-	const ctUrl = sessionId
+	// Determine URLs — reconstruction session, inference session, or HuggingFace dataset
+	const displayId = pantsCase ?? sessionId ?? reconstructionId ?? "1";
+	const ctUrl = reconstructionId
+		? `${API_BASE}/api/session-reconstruction/${reconstructionId}`
+		: sessionId
 		? `${API_BASE}/api/session-ct/${sessionId}`
 		: (() => { const p = getPanTSId(pantsCase ?? "1"); return `https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/image_only/${p}/ct.nii.gz?download=true`; })();
-	const segUrl = sessionId
+	const segUrl: string | undefined = reconstructionId
+		? undefined
+		: sessionId
 		? `${API_BASE}/api/session-segmentation/${sessionId}`
 		: (() => { const p = getPanTSId(pantsCase ?? "1"); return `https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/mask_only/${p}/combined_labels.nii.gz?download=true`; })();
 
@@ -153,13 +158,15 @@ function VisualizationPage() {
 			setVolumeId(volumeId);
 			toggleCrosshairTool(true);
 
-			const { nv, cmapCopy } = await create3DVolume(
-				render_ref,
-				segUrl,
-				labelColorMap
-			);
-			cmapRef.current = cmapCopy;
-			setNV(nv);
+			if (segUrl) {
+				const { nv, cmapCopy } = await create3DVolume(
+					render_ref,
+					segUrl,
+					labelColorMap
+				);
+				cmapRef.current = cmapCopy;
+				setNV(nv);
+			}
 		};
 
 		setup();
@@ -522,15 +529,17 @@ function VisualizationPage() {
 
 			{/* Fixed bottom bar for organ selection */}
 
-			<OrganCheckbox
-				setCheckState={setCheckState}
-				checkState={checkState}
-				sessionId={sessionKey}
-				setShowTaskDetails={setShowTaskDetails}
-				setShowOrganDetails={setShowOrganDetails}
-				showOrganDetails={showOrganDetails}
-				labelColorMap={labelColorMap}
-			/>
+			{!reconstructionId && (
+				<OrganCheckbox
+					setCheckState={setCheckState}
+					checkState={checkState}
+					sessionId={sessionKey}
+					setShowTaskDetails={setShowTaskDetails}
+					setShowOrganDetails={setShowOrganDetails}
+					showOrganDetails={showOrganDetails}
+					labelColorMap={labelColorMap}
+				/>
+			)}
 
 			{showReportScreen && (
 				<ReportScreen

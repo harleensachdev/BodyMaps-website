@@ -595,12 +595,25 @@ def run_epai_inference():
     model_name = _pick_text("model_name", "model", "MODEL_NAME") or "ePAI"
     uploaded_filename = _pick_text("uploaded_filename", "output_filename", "filename")
     input_server_path = _pick_text("INPUT_SERVER_PATH", "input_server_path", "server_path", "path")
+    source_reconstruction_session_id = _pick_text("source_reconstruction_session_id")
     ct_file = (
         request.files.get('MAIN_NIFTI')
         or request.files.get('file')
         or request.files.get('ct')
         or request.files.get('ct_file')
     )
+
+    if source_reconstruction_session_id and not input_server_path and ct_file is None:
+        source_job = inference_jobs.get(source_reconstruction_session_id, {})
+        source_output_dir = source_job.get("output_mask_dir")
+        if source_output_dir:
+            recon_path = os.path.join(source_output_dir, "reconstructed_ct.nii.gz")
+            if os.path.exists(recon_path):
+                input_server_path = recon_path
+            else:
+                return jsonify({"error": f"Reconstructed CT not found for session {source_reconstruction_session_id}"}), 404
+        else:
+            return jsonify({"error": f"Source reconstruction session {source_reconstruction_session_id} not found or not completed"}), 404
 
     if not input_server_path and uploaded_filename:
         candidate = os.path.join(Constants.SESSIONS_DIR_NAME, "inference", session_id, uploaded_filename)
@@ -903,6 +916,22 @@ def get_session_segmentation(session_id):
     if not os.path.exists(seg_path):
         return jsonify({"error": f"combined_labels.nii.gz not found at {seg_path}"}), 404
     response = make_response(send_file(seg_path, mimetype='application/gzip'))
+    response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+    response.headers['Content-Encoding'] = 'gzip'
+    return response
+
+
+@api_blueprint.route('/session-reconstruction/<session_id>', methods=['GET'])
+def get_session_reconstruction(session_id):
+    """Serves the OpenVAE reconstructed CT for a session."""
+    job = inference_jobs.get(session_id, {})
+    output_mask_dir = job.get("output_mask_dir")
+    if not output_mask_dir:
+        return jsonify({"error": "Reconstruction not ready for session"}), 404
+    recon_path = os.path.join(output_mask_dir, "reconstructed_ct.nii.gz")
+    if not os.path.exists(recon_path):
+        return jsonify({"error": f"reconstructed_ct.nii.gz not found"}), 404
+    response = make_response(send_file(recon_path, mimetype='application/gzip'))
     response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
     response.headers['Content-Encoding'] = 'gzip'
     return response

@@ -64,7 +64,7 @@ function getReferenceLineSlabThicknessControlsOn(viewportId: viewportIdTypes) {
         [viewportId1, viewportId2, viewportId3].indexOf(viewportId);
     return index !== -1;
 }
-export async function renderVisualization(ref1: HTMLDivElement, ref2: HTMLDivElement, ref3: HTMLDivElement, convertedColorLUT: ColorLUT, ctUrl: string, segUrl: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) {
+export async function renderVisualization(ref1: HTMLDivElement, ref2: HTMLDivElement, ref3: HTMLDivElement, convertedColorLUT: ColorLUT, ctUrl: string, segUrl: string | undefined, setLoading: React.Dispatch<React.SetStateAction<boolean>>) {
     coreInit();
     niftiImageLoaderInit();
     cornerstoneToolsInit();
@@ -106,7 +106,9 @@ export async function renderVisualization(ref1: HTMLDivElement, ref2: HTMLDivEle
 
     imageLoader.registerImageLoader("nifti", cornerstoneNiftiImageLoader);
     const imageIds = await createNiftiImageIdsAndCacheMetadata({ url: mainNiftiURL });
-    const segmentationImageIds = await createNiftiImageIdsAndCacheMetadata({ url: segmentationURL });
+    const segmentationImageIds = segmentationURL
+        ? await createNiftiImageIdsAndCacheMetadata({ url: segmentationURL })
+        : [];
 
     const viewportInputArray = [
         {
@@ -156,40 +158,41 @@ export async function renderVisualization(ref1: HTMLDivElement, ref2: HTMLDivEle
 
     renderingEngine.renderViewports(viewportInputArray.map((viewport) => viewport.viewportId));
 
-    const segmentationVolume = await volumeLoader.createAndCacheVolume(segmentationId, {
-        imageIds: segmentationImageIds
-    });
+    if (segmentationURL && segmentationImageIds.length > 0) {
+        const segmentationVolume = await volumeLoader.createAndCacheVolume(segmentationId, {
+            imageIds: segmentationImageIds
+        });
 
-    await segmentationVolume.load();
+        await segmentationVolume.load();
 
-    segmentation.segmentationStyle.setStyle({ type: SegmentationRepresentations.Labelmap, segmentationId: segmentationId }, DEFAULT_SEGMENTATION_CONFIG);
-    segmentation.removeAllSegmentations();
-    segmentation.addSegmentations([
-        {
-            segmentationId,
-            representation: {
-                type: SegmentationRepresentations.Labelmap,
-                data: {
-                    imageIds: segmentationImageIds,
-                    volumeId: segmentationId
-                },
-            },
-        },
-    ]);
-
-
-    viewportInputArray.forEach(async (viewport) => {
-        await segmentation.addSegmentationRepresentations(viewport.viewportId, [
+        segmentation.segmentationStyle.setStyle({ type: SegmentationRepresentations.Labelmap, segmentationId: segmentationId }, DEFAULT_SEGMENTATION_CONFIG);
+        segmentation.removeAllSegmentations();
+        segmentation.addSegmentations([
             {
                 segmentationId,
-                type: csToolsEnums.SegmentationRepresentations.Labelmap,
-                config: {
-                    colorLUTOrIndex: convertedColorLUT
-                }
-            }
+                representation: {
+                    type: SegmentationRepresentations.Labelmap,
+                    data: {
+                        imageIds: segmentationImageIds,
+                        volumeId: segmentationId
+                    },
+                },
+            },
         ]);
-        segmentation.activeSegmentation.setActiveSegmentation(viewport.viewportId, segmentationId);
-    })
+
+        viewportInputArray.forEach(async (viewport) => {
+            await segmentation.addSegmentationRepresentations(viewport.viewportId, [
+                {
+                    segmentationId,
+                    type: csToolsEnums.SegmentationRepresentations.Labelmap,
+                    config: {
+                        colorLUTOrIndex: convertedColorLUT
+                    }
+                }
+            ]);
+            segmentation.activeSegmentation.setActiveSegmentation(viewport.viewportId, segmentationId);
+        });
+    }
 
     renderingEngine.renderViewports(viewportInputArray.map((viewport) => viewport.viewportId));
     setLoading(false);
