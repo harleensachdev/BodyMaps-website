@@ -149,7 +149,7 @@ class NpzProcessor:
         return combined_labels_img_data, organ_intensities
 
     
-    def nifti_combine_labels(self, id: int, keywords: dict[str, str] = {"pancrea": "pancreas"}, save=True):
+    def nifti_combine_labels(self, id: int, keywords: dict[str, str] = {"pancrea": "pancreas"}, save=True, organs: list[str]=[]):
         """
         Merge multiple NIfTI label masks into one combined segmentation and re-index the labels.
         """
@@ -168,8 +168,11 @@ class NpzProcessor:
         dir_path = pathlib.Path(
             f"{Constants.PANTS_PATH}/data/{segment_subfolder}/{get_panTS_id(id)}/segmentations"
         )
-        nii_files = list(dir_path.glob("*.nii*"))
 
+        if (len(organs) == 0):
+            nii_files = list(dir_path.glob("*.nii*"))
+        else: 
+            nii_files = [f for f in dir_path.glob("*.nii*") if f.name.replace(".nii.gz","") in organs]
         if not nii_files:
             raise FileNotFoundError(f"No NIfTI label files found in {dir_path}")
 
@@ -226,4 +229,4 @@ class NpzProcessor:
             with open(organ_save_path, "w") as f:
                 json.dump(organ_intensities, f, indent=2)
 
-        return combined_labels, organ_intensities
+        return combined_labels, organ_intensities, base_nifti.affine, base_nifti.header

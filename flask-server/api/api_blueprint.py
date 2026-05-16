@@ -18,6 +18,7 @@ from reportlab.lib.units import cm
 
 from sqlalchemy.orm import aliased
 import os
+import io
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -387,7 +388,35 @@ def get_report(id):
         if os.path.exists(temp_pdf_path):
             os.remove(temp_pdf_path)
 
+@api_blueprint.route('/get-specific-segmentations/<combined_labels_id>', methods=['POST'])
+async def get_specific_segmentations(combined_labels_id):
+    combined_labels_id = combined_labels_id.replace("PanTS_", "")
+    combined_labels_id = combined_labels_id.lstrip("0")
+    try: 
+        organs = json.loads(request.form["organs"])
+        niftiProcessor = NpzProcessor()
+        combined_labels, intensities, affine, header = niftiProcessor.nifti_combine_labels(int(combined_labels_id), {}, save=False, organs=organs)
+        if combined_labels.dtype != np.uint8:
+            data_uint8 = combined_labels.astype(np.uint8)
+            new_img = nib.Nifti1Image(data_uint8, affine, header=header)
+            new_img.set_data_dtype(np.uint8)
+        else:
+            new_img = nib.Nifti1Image(combined_labels, affine, header=header)
+            new_img.set_data_dtype(np.uint8)
+        
+        buffer = io.BytesIO()
+        file_map = new_img.make_file_map()
+        file_map['image'].fileobj = buffer
+        new_img.to_file_map(file_map)
 
+        buffer.seek(0)
+        
+        response = send_file(buffer, as_attachment=True, download_name="combined_specific_labels.nii.gz", mimetype="application/gzip")
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        response.headers['Content-Encoding'] = 'gzip'
+        return response
+    except Exception as e: 
+        return jsonify({"error": f"Error loading organ metrics: {str(e)}"}), 500
 @api_blueprint.route('/get-segmentations/<combined_labels_id>', methods=['GET'])
 async def get_segmentations(combined_labels_id):
     subfolder = "LabelTr" if int(combined_labels_id) < 9000 else "LabelTe" 
@@ -432,9 +461,9 @@ async def get_segmentations(combined_labels_id):
 
         response = make_response(send_file(converted_path, mimetype='application/gzip'))
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        response.headers['Content-Encoding'] = 'gzip'
         # response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
         # response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
-        response.headers['Content-Encoding'] = 'gzip'
 
         return response
 

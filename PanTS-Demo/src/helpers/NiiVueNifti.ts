@@ -1,7 +1,7 @@
 import type { Color } from '@cornerstonejs/core/types';
 import { Niivue, NVImage, SLICE_TYPE } from '@niivue/niivue';
 import type { NColorMap } from '../types';
-import { segmentation_categories } from './constants';
+import { API_BASE, segmentation_categories } from './constants';
 
 
 
@@ -36,7 +36,7 @@ export async function create3DVolume(canvasRef: React.RefObject<HTMLCanvasElemen
 
   if (!canvasRef.current) return { nv, nvImage: null, cmapCopy: {R: [], G: [], B: [], I: [], A: []} };
   nv.attachToCanvas(canvasRef.current);
-
+  
   const nvImage = await NVImage.loadFromUrl({
     name: "combined_labels.nii.gz",
     url: segUrl,
@@ -140,12 +140,28 @@ export async function create3DVolumeFew(canvasRef: React.RefObject<HTMLCanvasEle
   console.log(visibleIds)
   if (!canvasRef.current) return { nv, nvImage: null, cmapCopy: {R: [], G: [], B: [], I: [], A: []} };
   nv.attachToCanvas(canvasRef.current);
-  const segUrl = `https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/mask_only/${pantsCase}/segmentations/${segmentation_categories[visibleIds[0]]}.nii.gz?download=true`;
-  console.log(segUrl)
-  const nvImage = await NVImage.loadFromUrl({
-    name: segmentation_categories[0] + ".nii.gz",
-    url: segUrl,
+  // const segUrl = `https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/mask_only/${pantsCase}/segmentations/${segmentation_categories[visibleIds[0]]}.nii.gz?download=true`;
+  // console.log(segUrl)
+  // const nvImage = await NVImage.loadFromUrl({
+  //   name: segmentation_categories[0] + ".nii.gz",
+  //   url: segUrl,
+  // });
+
+  const formData = new FormData();
+  formData.append("organs", JSON.stringify(visibleIds.map(id => segmentation_categories[id])));
+  const res = await fetch(`${API_BASE}/api/get-specific-segmentations/${pantsCase}`, {
+    method: 'POST',
+    body: formData
   });
+
+  const blob = await res.blob();
+  const segFile = new File([blob], "combined_specific_labels.nii.gz", {
+    "type": "application/gzip"
+  })
+
+  const nvImage = await NVImage.loadFromFile({
+    file: segFile
+  })
 
   const labelIds = Object.keys(colorLUT).map(id => parseInt(id));
   const maxLabelId = Math.max(...labelIds);
@@ -155,19 +171,21 @@ export async function create3DVolumeFew(canvasRef: React.RefObject<HTMLCanvasEle
   const B = Array(maxLabelId).fill(0);
   const A = Array(maxLabelId).fill(0);
   const I = Array(maxLabelId).fill(0);
+  let i = 1;
   for (const rawLabelId in colorLUT) {
     const labelId = parseInt(rawLabelId);
-    if (labelId-1 !== visibleIds[0]) continue
+    if (!visibleIds.some(id => id === labelId)) continue;
     const color = colorLUT[rawLabelId];
     // if (!color || [color[0], color[1], color[2]].some(v => v === undefined)) {
     //   console.warn(`❗ Invalid color for label ${labelId}`);
     //   continue;
     // }
-    R[1] = color[0];
-    G[1] = color[1];
-    B[1] = color[2];
-    A[1] = color[3] ?? 128;
-    I[1] = 1;
+    R[i] = color[0];
+    G[i] = color[1];
+    B[i] = color[2];
+    A[i] = color[3] ?? 128;
+    I[i] = i;
+    i++;
   }
   const cmapCopy = {
     R: R,

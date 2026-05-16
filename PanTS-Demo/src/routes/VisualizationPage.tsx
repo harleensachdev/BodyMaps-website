@@ -3,8 +3,8 @@ import type { Color, ColorLUT } from "@cornerstonejs/core/types";
 import type { vtkVolumeProperty } from '@kitware/vtk.js/Rendering/Core/VolumeProperty';
 import { Niivue } from "@niivue/niivue";
 import {
-	IconDownload, IconHome, IconPointer, IconReport,
-	IconSettings
+    IconDownload, IconHome, IconPointer, IconReport,
+    IconSettings
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -16,17 +16,17 @@ import SnakeGame from "../components/SnakeGame/SnakeGame";
 import WindowingSlider from "../components/WindowingSlider/WindowingSlider";
 import ZoomHandle from "../components/zoomHandle";
 import {
-	renderVisualization,
-	setToolGroupOpacity,
-	setVisibilities,
-	toggleCrosshairTool,
+    renderVisualization,
+    setToolGroupOpacity,
+    setVisibilities,
+    toggleCrosshairTool,
 } from "../helpers/CornerstoneNifti2";
 import { create3DVolume, create3DVolumeFew, updateVisibilities } from "../helpers/NiiVueNifti";
 import {
-	API_BASE,
-	APP_CONSTANTS,
-	segmentation_categories,
-	segmentation_category_colors,
+    API_BASE,
+    APP_CONSTANTS,
+    segmentation_categories,
+    segmentation_category_colors,
 } from "../helpers/constants";
 import { filenameToName, getPanTSId } from "../helpers/utils";
 import { type CheckBoxData, type LastClicked, type NColorMap } from "../types";
@@ -243,9 +243,9 @@ function VisualizationPage() {
 				...checkBoxData.map((item) => !!checkState[item.id]),
 			];
 			const visible = checkStateArr.map((item, idx) => item === true ? idx-1 : null).filter((item) => item !== null);
-			if (visible.length === 2) {
+			if (visible.length === 3) {
 				visible.splice(0, 1);
-				console.log(segmentation_categories[visible[0]])
+				console.log(visible.map((item) => segmentation_categories[item]));
 				create3DVolumeFew(render_ref, labelColorMap, getPanTSId(pantsCase ?? "1"), visible);
 				return;
 			}
