@@ -2,6 +2,7 @@ import {
 	IconAdjustmentsHorizontal,
 	IconArrowsShuffle,
 	IconAtom,
+	IconBookmark,
 	IconBuildingHospital,
 	IconChevronDown,
 	IconDatabase,
@@ -25,6 +26,12 @@ import {
 	type TumorFilter,
 } from "../helpers/search";
 import { prefetchViewer } from "../helpers/prefetchViewer";
+import {
+	loadSavedCases,
+	SAVED_CASES_EVENT,
+	type SavedCase,
+	toggleSavedCase,
+} from "../helpers/savedCases";
 import type { PreviewType } from "../types";
 
 // Live facet counts from /api/facets (conditioned on the current filters).
@@ -150,6 +157,27 @@ export default function Homepage() {
 	const [page, setPage] = useState(1);
 	const [pageInput, setPageInput] = useState("");
 	const [resultCount, setResultCount] = useState<number | null>(null);
+
+	// Bookmarked cases (localStorage). `showSaved` swaps the grid to show only these.
+	const [savedCases, setSavedCases] = useState<SavedCase[]>(loadSavedCases);
+	const [showSaved, setShowSaved] = useState(false);
+	const savedIds = new Set(savedCases.map((c) => c.id));
+
+	// Keep in sync when a bookmark is toggled here or in another tab.
+	useEffect(() => {
+		const refresh = () => setSavedCases(loadSavedCases());
+		window.addEventListener(SAVED_CASES_EVENT, refresh);
+		window.addEventListener("storage", refresh);
+		return () => {
+			window.removeEventListener(SAVED_CASES_EVENT, refresh);
+			window.removeEventListener("storage", refresh);
+		};
+	}, []);
+
+	const handleToggleSave = (id: number, meta?: PreviewType) => {
+		const m = meta ?? previewMetadata[id];
+		toggleSavedCase({ id, sex: m?.sex ?? "", age: m?.age ?? 0, tumor: m?.tumor ?? 0 });
+	};
 
 	// Turn /api/search (or /api/random) items into the ids + metadata the grid needs.
 	const ingestItems = (items: SearchItem[]) => {
@@ -281,7 +309,6 @@ export default function Homepage() {
 		if (!showFilters) return;
 		const t = setTimeout(() => loadMatchTotal(filters), 200);
 		return () => clearTimeout(t);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [filters, showFilters]);
 
 	// Warm the code-split viewer chunk once the dashboard is idle, so the first
@@ -546,6 +573,31 @@ export default function Homepage() {
 							>
 								<IconArrowsShuffle size={14} />
 								Shuffle Cases
+							</button>
+							<button
+								className="flex items-center gap-1.5 transition-all duration-200"
+								style={{
+									fontSize: "11px",
+									color: showSaved ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.45)",
+									background: "transparent",
+									border: "none",
+									cursor: "pointer",
+									textTransform: "none",
+									letterSpacing: "0.04em",
+									fontFamily: "'JetBrains Mono', monospace",
+								}}
+								onMouseEnter={(e) => {
+									(e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.85)";
+								}}
+								onMouseLeave={(e) => {
+									(e.currentTarget as HTMLElement).style.color = showSaved
+										? "rgba(0,0,0,0.85)"
+										: "rgba(0,0,0,0.45)";
+								}}
+								onClick={() => setShowSaved((v) => !v)}
+							>
+								<IconBookmark size={14} />
+								{showSaved ? "Back to browse" : `Saved${savedCases.length ? ` (${savedCases.length})` : ""}`}
 							</button>
 						</div>
 					</div>
@@ -856,7 +908,7 @@ export default function Homepage() {
 				</div>
 
 				{/* Results summary */}
-				{resultCount !== null && (
+				{!showSaved && resultCount !== null && (
 					<div
 						className="flex items-center justify-between"
 						style={{ marginBottom: "16px", padding: "0 4px" }}
@@ -893,28 +945,55 @@ export default function Homepage() {
 				)}
 
 				{/* Grid */}
-				<div className="grid gap-4"
-					style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
-				>
-					{loading
-						? Array.from({ length: resultCount !== null ? PER_PAGE : CARD_COUNT }).map((_, i) => (
-								<div
-									key={i}
-									className="bm-card-skeleton rounded-xl"
-									style={{ aspectRatio: "3/4" }}
-								/>
-							))
-						: PREVIEW_IDS.map((id) => (
-								<Preview
-									key={id}
-									id={id}
-									previewMetadata={previewMetadata[id]}
-								/>
-							))}
-				</div>
+				{showSaved && savedCases.length === 0 ? (
+					<div
+						style={{
+							padding: "48px 0",
+							textAlign: "center",
+							fontFamily: "'JetBrains Mono', monospace",
+							fontSize: "13px",
+							color: "rgba(0,0,0,0.5)",
+						}}
+					>
+						No saved cases yet — click the bookmark on any case to save it here.
+					</div>
+				) : (
+					<div className="grid gap-4" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+						{showSaved
+							? savedCases.map((c) => (
+									<Preview
+										key={c.id}
+										id={c.id}
+										previewMetadata={{ sex: c.sex, age: c.age, tumor: c.tumor }}
+										saved
+										onToggleSave={() =>
+											handleToggleSave(c.id, { sex: c.sex, age: c.age, tumor: c.tumor })
+										}
+									/>
+								))
+							: loading
+								? Array.from({ length: resultCount !== null ? PER_PAGE : CARD_COUNT }).map((_, i) => (
+										<div
+											key={i}
+											className="bm-card-skeleton rounded-xl"
+											style={{ aspectRatio: "3/4" }}
+										/>
+									))
+								: PREVIEW_IDS.map((id) => (
+										<Preview
+											key={id}
+											id={id}
+											previewMetadata={previewMetadata[id]}
+											saved={savedIds.has(id)}
+											onToggleSave={() => handleToggleSave(id)}
+										/>
+									))}
+					</div>
+				)}
 				
 				{/* Page navigation over the current cohort — only one page is ever in the DOM. */}
-				{resultCount !== null &&
+				{!showSaved &&
+					resultCount !== null &&
 					resultCount > PER_PAGE &&
 					(() => {
 						const pages = Math.max(1, Math.ceil(resultCount / PER_PAGE));
