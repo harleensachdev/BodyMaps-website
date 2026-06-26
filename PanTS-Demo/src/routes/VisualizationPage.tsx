@@ -48,7 +48,6 @@ import {
     toggleCrosshairTool,
     type MeasurementToolName
 } from "../helpers/CornerstoneNifti2";
-import { moveNiiVueCrosshairToMm } from "../helpers/NiiVueNifti";
 import { filenameToName, getPanTSId } from "../helpers/utils";
 import { decodeViewerState, encodeViewerState } from "../helpers/viewerShareState";
 import { type CheckBoxData } from "../types";
@@ -521,7 +520,8 @@ function VisualizationPage() {
 		const centroid = getOrganCentroids()?.[label];
 		if (!centroid) return; // organ not present in this scan
 		moveCornerstoneCrosshairToMm(centroid);
-		if (NV) moveNiiVueCrosshairToMm(NV, centroid);
+		setCrosshairMm(centroid);
+		// if (NV) moveNiiVueCrosshairToMm(NV, centroid);
 		setCheckState((prev) => {
 			if (prev[label]) return prev;
 			const next = [...prev];
