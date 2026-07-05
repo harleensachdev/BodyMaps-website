@@ -1,4 +1,5 @@
 from flask import Blueprint, send_file, make_response, request, jsonify, Response
+from werkzeug.utils import secure_filename
 from services.nifti_processor import NiftiProcessor
 from services.session_manager import SessionManager, generate_uuid
 from services.auto_segmentor import run_auto_segmentation
@@ -195,7 +196,7 @@ def get_preview(clabel_ids):
 def get_image_preview(clabel_id):
     if not _is_safe_id(clabel_id):
         return jsonify({"error": "Invalid id"}), 400
-    path = os.path.join(Constants.PANTS_PATH, "profile_only", get_panTS_id(clabel_id), "profile.jpg")
+    path = os.path.join(Constants.PANTS_PATH, "profile_only", get_panTS_id(secure_filename(clabel_id)), "profile.jpg")
     if not os.path.exists(path):
         return jsonify({"error": f"File not found: {path} "}), 404
     return send_file(
@@ -210,7 +211,7 @@ def get_image_preview(clabel_id):
 def get_mesh_manifest(case_id):
     if not _is_safe_id(case_id):
         return jsonify({"error": "Invalid id"}), 400
-    manifest_path = os.path.join(Constants.MESH_PATH, get_panTS_id(case_id), "manifest.json")
+    manifest_path = os.path.join(Constants.MESH_PATH, get_panTS_id(secure_filename(case_id)), "manifest.json")
 
     if not os.path.exists(manifest_path):
         return jsonify({"error": f"File not found: {manifest_path} "}), 404
@@ -333,7 +334,7 @@ def get_mask_data():
 def get_main_nifti(clabel_id):
     if not _is_safe_id(clabel_id):
         return jsonify({"error": "Invalid id"}), 400
-    case_dir = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(clabel_id)}"
+    case_dir = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(secure_filename(clabel_id))}"
     main_nifti_path = f"{case_dir}/{Constants.MAIN_NIFTI_FILENAME}"
 
     # ?res=low → serve the precomputed low-res copy when present (much smaller/faster
@@ -373,8 +374,8 @@ def get_report(id):
 
 
         base_path = f"{SESSIONS_DIR}/{id}"
-        ct_path = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(id)}/{Constants.MAIN_NIFTI_FILENAME}"
-        masks = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(id)}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+        ct_path = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(secure_filename(str(id)))}/{Constants.MAIN_NIFTI_FILENAME}"
+        masks = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(secure_filename(str(id)))}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
         
         template_pdf = os.getenv("TEMPLATE_PATH", "report_template_3.pdf")
 
@@ -446,7 +447,7 @@ async def get_specific_segmentations(combined_labels_id):
 async def get_segmentations(combined_labels_id):
     if not _is_safe_id(combined_labels_id):
         return jsonify({"error": "Invalid id"}), 400
-    nifti_path = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(combined_labels_id)}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+    nifti_path = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(secure_filename(combined_labels_id))}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
     labels = list(Constants.PREDEFINED_LABELS.values())
     # ?res=low → serve the precomputed low-res mask (paired with the low-res CT so the
     # overlay stays aligned). Falls back to full res below if it hasn't been generated.
@@ -495,7 +496,7 @@ def download_segmentation_zip(id):
     try:
         if not _is_safe_id(id):
             return jsonify({"error": "Invalid id"}), 400
-        outputs_ct_folder = Path(f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(id)}/segmentations")
+        outputs_ct_folder = Path(f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(secure_filename(str(id)))}/segmentations")
         
         if not os.path.exists(outputs_ct_folder):
             return jsonify({"error": "Outputs/ct folder not found"}), 404
