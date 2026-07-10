@@ -369,14 +369,17 @@ def get_report(id):
             organ_metrics = organ_metrics.get("organ_metrics", [])
         except Exception as e:
             return jsonify({"error": f"Error loading organ metrics: {str(e)}"}), 500
-
-
+ 
         base_path = f"{SESSIONS_DIR}/{id}"
-        ct_path = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(secure_filename(str(id)))}/{Constants.MAIN_NIFTI_FILENAME}"
-        masks = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(secure_filename(str(id)))}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
-        
+        # New flat structure, matching get-main-nifti / get-label-colormap above —
+        # this fixes a bug from the merge where `subfolder`/`label_subfolder` were
+        # referenced here but never defined, which would have raised a NameError
+        # on every call to this route.
+        ct_path = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(id)}/{Constants.MAIN_NIFTI_FILENAME}"
+        masks = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(id)}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+ 
         template_pdf = os.getenv("TEMPLATE_PATH", "report_template_3.pdf")
-
+ 
         extracted_data = None
         column_headers = None
         try:
@@ -386,7 +389,7 @@ def get_report(id):
             column_headers = df.columns.tolist()
         except Exception:
             pass
-
+ 
         generate_pdf_with_template(
             output_pdf=output_pdf_path,
             folder_name=id,
@@ -398,21 +401,308 @@ def get_report(id):
             extracted_data=extracted_data,
             column_headers=column_headers
         )
-
+ 
         return send_file(
             output_pdf_path,
             mimetype="application/pdf",
             as_attachment=True,
             download_name=f"report_{id}.pdf"
         )
-
+ 
     except Exception as e:
         return jsonify({"error": f"Unhandled error: {str(e)}"}), 500
-
+ 
     finally:
         if os.path.exists(temp_pdf_path):
             os.remove(temp_pdf_path)
+ 
+ 
+@api_blueprint.route('/explain-impressions', methods=['POST'])
+def explain_impressions():
+    """Deprecated: plain-language explanations required Ollama, which isn't
+    available in production. The frontend no longer calls this button, but
+    the route stays as a stable no-op so old clients don't 404."""
+    return jsonify({
+        "plain_language": ["Plain-language summary unavailable — please ask your doctor to walk through these findings with you."],
+    }), 200
+ 
+@api_blueprint.route('/define-term', methods=['GET'])
+def define_term():
+    """Returns a plain-English definition for a clicked medical term, from
+    the hardcoded MEDICAL_TERM_DICTIONARY only — no LLM fallback."""
+    term = (request.args.get('term') or '').strip().lower()
+    if not term:
+        return jsonify({"error": "Missing term parameter"}), 400
 
+    if term in MEDICAL_TERM_DICTIONARY:
+        return jsonify({"term": term, "definition": MEDICAL_TERM_DICTIONARY[term], "source": "dictionary"})
+
+    return jsonify({
+        "term": term,
+        "definition": "Definition unavailable — try asking your doctor what this term means.",
+        "source": "fallback",
+    }), 200
+ 
+ 
+@api_blueprint.route('/get-report-data/<id>', methods=['GET'])
+def get_report_data(id):
+    if id is None or not str(id).isdigit():
+        return jsonify({"error": "Invalid id parameter"}), 400
+    case_id = int(id)
+    try:
+        if id is None or not str(id).isdigit():
+            return jsonify({"error": "Invalid id parameter"}), 400
+        id = str(int(id))
+        # ── Try RadGPT structured report from metadata.xlsx first ─────────────
+        # This uses Zongwei Zhou's own RadGPT model output — more accurate
+        # than Ollama-generated impressions. Falls back to Ollama if not found.
+        radgpt_comments = None
+        radgpt_impression = None
+        try:
+            import openpyxl, re
+            metadata_path = os.path.join(Constants.PANTS_PATH, "data", "metadata.xlsx")
+            if os.path.exists(metadata_path):
+                wb = openpyxl.load_workbook(metadata_path, read_only=True, data_only=True)
+                ws = wb.active
+                headers = [cell.value for cell in next(ws.iter_rows())]
+                id_col = next((i for i, h in enumerate(headers) if h and 'ID' in str(h)), 0)
+                report_col = next((i for i, h in enumerate(headers) if h and 'report' in str(h).lower()), -1)
+                if report_col >= 0:
+                    pants_id = get_panTS_id(id)
+                    for row in ws.iter_rows(min_row=2, values_only=True):
+                        row_id = str(row[id_col] or '').strip()
+                        if row_id == pants_id:
+                            raw = str(row[report_col] or '')
+                            # Clean Windows carriage return artifacts
+                            raw = raw.replace('_x000D_', '\n').replace('\r\n', '\n').replace('\r', '\n')
+                            # Collapse multiple blank lines
+                            import re as _re
+                            raw = _re.sub(r'\n{3,}', '\n\n', raw)
+                            findings_match = re.search(r'FINDINGS:(.*?)(?=IMPRESSION:|$)', raw, re.DOTALL)
+                            impression_match = re.search(r'IMPRESSION:(.*?)$', raw, re.DOTALL)
+                            if findings_match:
+                                radgpt_comments = findings_match.group(1).strip()
+                            if impression_match:
+                                imp_text = impression_match.group(1).strip()
+                                # Keep full impression, split into sentences
+                                sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', imp_text) if s.strip()]
+                                radgpt_impression = sentences if sentences else [imp_text]
+                            print(f"[RadGPT] Found report for case {id}: {radgpt_impression}")
+                            break
+                wb.close()
+        except Exception as e:
+            print(f"[RadGPT] metadata lookup failed: {e}")
+        # ─────────────────────────────────────────────────────────────────────
+        subfolder = "ImageTr" if case_id < 9000 else "ImageTe"
+        label_subfolder = "LabelTr" if case_id < 9000 else "LabelTe"
+        # Check image_only first (new structure), fall back to data/ImageTr
+        image_only_path = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(case_id)}/{Constants.MAIN_NIFTI_FILENAME}"
+        data_ct_path = f"{Constants.PANTS_PATH}/data/{subfolder}/{get_panTS_id(case_id)}/{Constants.MAIN_NIFTI_FILENAME}"
+        ct_path = image_only_path if os.path.exists(image_only_path) else data_ct_path
+        # Check mask_only first (new structure), fall back to data/LabelTe
+        mask_only_path = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(case_id)}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+        data_mask_path = f"{Constants.PANTS_PATH}/data/{label_subfolder}/{get_panTS_id(case_id)}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+        mask_path = mask_only_path if os.path.exists(mask_only_path) else data_mask_path
+        seg_dir = f"{Constants.PANTS_PATH}/data/{label_subfolder}/{get_panTS_id(case_id)}/segmentations"
+ 
+        pid = get_panTS_id(case_id)
+        meta = _METADATA_CACHE.get(pid, {})
+        age = meta.get("age", "N/A")
+        sex = meta.get("sex", "N/A")
+ 
+        wb = load_workbook(os.path.join(Constants.PANTS_PATH, "data", "metadata.xlsx"))
+        sheet = wb["PanTS_metadata"]
+        contrast = ""
+        study_detail = ""
+        for row in sheet.iter_rows(values_only=True):
+            if row[0] == pid:
+                contrast = row[3]
+                study_detail = row[8]
+                break
+ 
+        # If local files don't exist, download from HuggingFace
+        if not os.path.exists(ct_path) or not os.path.exists(mask_path):
+            import requests, tempfile
+            pants_id = get_panTS_id(id)
+            hf_base = f"https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main"
+            tmp_dir = tempfile.mkdtemp()
+            if not os.path.exists(ct_path):
+                hf_ct = f"{hf_base}/image_only/{pants_id}/ct.nii.gz?download=true"
+                ct_path = os.path.join(tmp_dir, "ct.nii.gz")
+                print(f"[HuggingFace] Downloading CT for case {id}...")
+                r = requests.get(hf_ct, stream=True, verify=False)
+                with open(ct_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            if not os.path.exists(mask_path):
+                hf_mask = f"{hf_base}/mask_only/{pants_id}/combined_labels.nii.gz?download=true"
+                mask_path = os.path.join(tmp_dir, "combined_labels.nii.gz")
+                print(f"[HuggingFace] Downloading mask for case {id}...")
+                r = requests.get(hf_mask, stream=True, verify=False)
+                with open(mask_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+ 
+        ct_nii = nib.load(ct_path)
+        spacing = ct_nii.header.get_zooms()
+        shape = ct_nii.shape
+        ct_array = ct_nii.get_fdata()
+        mask_nii = nib.load(mask_path)
+        mask_array = mask_nii.get_fdata().astype(np.uint8)
+        # Crop both arrays to the minimum shape along each axis
+        # to handle slight size mismatches between CT and mask
+        min_shape = tuple(min(c, m) for c, m in zip(ct_array.shape, mask_array.shape))
+        ct_array = ct_array[:min_shape[0], :min_shape[1], :min_shape[2]]
+        mask_array = mask_array[:min_shape[0], :min_shape[1], :min_shape[2]]
+        voxel_volume = np.prod(mask_nii.header.get_zooms()) / 1000
+        # World-space affine - converts a voxel index (i, j, k) to real
+        # millimeter coordinates. This is what makes the centroid below a
+        # REAL position usable by moveCornerstoneCrosshairToMm, rather
+        # than a placeholder.
+        affine = mask_nii.affine
+ 
+        LABELS = {v: k for k, v in Constants.PREDEFINED_LABELS.items()}
+ 
+        # Soft physiological sanity ranges per organ type, used only to
+        # flag "this needs review" vs "looks normal" internally. NOT
+        # shown to the user as raw numbers - the frontend only ever sees
+        # the `status` field. This is a stopgap for a known upstream
+        # segmentation/data issue where some organs read in the air range;
+        # rather than silently showing a wrong number as fact, or trying
+        # to "correct" the data here, we flag it so the UI can say
+        # "needs review" instead of presenting a confident wrong reading.
+        SOLID_ORGAN_HU_RANGE = (-20, 150)      # liver, spleen, kidney, pancreas, etc.
+        GI_HOLLOW_ORGAN_HU_RANGE = (-300, 200)  # colon, stomach, intestine, duodenum - tightened from
+                                                 # -1000 so a mean this close to pure air (e.g. -756 for
+                                                 # colon) correctly flags "check" instead of "normal" -
+                                                 # a real colon has enough wall/stool tissue that a mean
+                                                 # in the deep-air range usually signals a segmentation
+                                                 # issue, not a genuinely normal reading.
+        LUNG_HU_RANGE = (-1000, -200)            # lungs are genuinely air-filled - this range is correct as-is
+        GI_HOLLOW_ORGANS = {"colon", "stomach", "intestine", "duodenum"}
+        LUNG_ORGANS = {"lung_left", "lung_right"}
+ 
+        organ_volumes = {}
+        NO_FLAG_ORGANS = {
+            "femur_left", "femur_right", "aorta", "postcava", "veins",
+            "celiac_artery", "superior_mesenteric_artery", "renal_vein_left",
+            "renal_vein_right", "common_bile_duct", "pancreatic_duct",
+        }
+        for organ, label_id in LABELS.items():
+            if label_id == 0:
+                continue
+            mask = (mask_array == label_id)
+            if not np.any(mask):
+                continue
+            volume = float(np.sum(mask) * voxel_volume)
+            mean_hu = float(np.mean(ct_array[mask]))
+ 
+            if organ in LUNG_ORGANS:
+                lo, hi = LUNG_HU_RANGE
+            elif organ in GI_HOLLOW_ORGANS:
+                lo, hi = GI_HOLLOW_ORGAN_HU_RANGE
+            else:
+                lo, hi = SOLID_ORGAN_HU_RANGE
+            status = "normal" if organ in NO_FLAG_ORGANS else ("check" if (mean_hu < lo or mean_hu > hi) else "normal")
+ 
+            # Real centroid: voxel-space center of mass, converted to mm
+            # via the affine. This is genuine anatomical position - not a
+            # placeholder - and feeds the same crosshair-navigation
+            # plumbing already used elsewhere (moveCornerstoneCrosshairToMm
+            # / moveNiiVueCrosshairToMm) for click-to-jump.
+            voxel_coords = np.argwhere(mask)
+            centroid_voxel = voxel_coords.mean(axis=0)  # (i, j, k) in voxel space
+            centroid_world = nib.affines.apply_affine(affine, centroid_voxel)
+ 
+            # Bounding box dimensions in cm (real physical size of the organ)
+            bbox_min = voxel_coords.min(axis=0)
+            bbox_max = voxel_coords.max(axis=0)
+            bbox_voxels = bbox_max - bbox_min + 1
+            # Convert voxel counts to mm using spacing, then to cm
+            spacing_mm = np.abs([affine[0,0], affine[1,1], affine[2,2]])
+            dims_mm = bbox_voxels * spacing_mm
+            dims_cm = [round(float(d)/10, 1) for d in dims_mm]
+ 
+            organ_volumes[organ] = {
+                "volume": round(volume, 2),
+                "mean_hu": round(mean_hu, 1),
+                "status": status,
+                "centroid_mm": [round(float(c), 2) for c in centroid_world],
+                "dimensions": dims_cm,
+            }
+ 
+        lesions = {}
+        lesion_files = {
+            "pancreas": "pancreatic_lesion.npz",
+            "liver": "liver_lesion.npz",
+            "kidney": "kidney_lesion.npz",
+        }
+        for organ, filename in lesion_files.items():
+            path = os.path.join(seg_dir, filename)
+            if os.path.exists(path):
+                data = np.load(path)["data"]
+                voxels = int(np.sum(data > 0))
+                if voxels > 0:
+                    lesion_volume = round(voxels * voxel_volume, 2)
+                    lesions[organ] = {"voxels": voxels, "volume": lesion_volume}
+ 
+        organ_data_str = ""
+        for organ, vals in organ_volumes.items():
+            organ_data_str += f"{organ.replace('_', ' ')}: volume={vals['volume']}cc, mean HU={vals['mean_hu']}\n"
+ 
+        # If we have a RadGPT report, it is the authoritative source for organ status.
+        # Reset everything to normal first, then flag only what RadGPT calls abnormal.
+        if radgpt_comments:
+            for organ in list(organ_volumes.keys()):
+                organ_volumes[organ]['status'] = 'normal'
+            abnormal_keywords = ['enlarged', 'mass', 'lesion', 'tumor', 'abnormal',
+                                 'dilated', 'obstruction', 'isoattenuating', 'hypodense',
+                                 'hyperdense', 'cyst', 'nodule', 'atrophy', 'bilateral']
+            # Build stripped root for flexible matching
+            organ_roots = {}
+            for organ in organ_volumes.keys():
+                root = organ.replace('_left','').replace('_right','').replace('_body','') \
+                            .replace('_head','').replace('_tail','').replace('_gland','') \
+                            .replace('_duct','').replace('_lesion','').replace('_','')
+                organ_roots[organ] = root.lower()
+            for line in radgpt_comments.split('\n'):
+                line_stripped = line.lower().replace(' ','').replace('_','')
+                if any(kw in line.lower() for kw in abnormal_keywords):
+                    for organ, root in organ_roots.items():
+                        # Skip subtypes unless explicitly mentioned
+                        # e.g. "pancreas enlarged" shouldn't flag pancreas_body/head/tail
+                        if '_body' in organ or '_head' in organ or '_tail' in organ or '_duct' in organ:
+                            # Only flag subtype if the subtype word is in the line
+                            subtype = organ.split('_')[-1]
+                            if root in line_stripped and subtype in line.lower():
+                                organ_volumes[organ]['status'] = 'check'
+                        else:
+                            if root in line_stripped:
+                                organ_volumes[organ]['status'] = 'check'
+        comments = radgpt_comments or "Clinical comments unavailable."
+        impression_items = radgpt_impression or ["No impression available for this case."]
+ 
+        return jsonify({
+            "case_id": id,
+            "patient": {"age": age, "sex": sex},
+            "imaging": {
+                "study_type": study_detail,
+                "contrast": contrast,
+                "spacing": [round(float(s), 3) for s in spacing],
+                "shape": list(shape),
+            },
+            "organ_volumes": organ_volumes,
+            "lesions": lesions,
+            "comments": comments,
+            "impression": impression_items,
+        })
+ 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "An internal error occurred."}), 500
+ 
+ 
 @api_blueprint.route('/get-specific-segmentations/<combined_labels_id>', methods=['POST'])
 async def get_specific_segmentations(combined_labels_id):
     combined_labels_id = combined_labels_id.replace("PanTS_", "")

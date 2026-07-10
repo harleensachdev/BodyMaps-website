@@ -90,7 +90,8 @@
 .visualization-container > div {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 .report-container button {
@@ -1126,4 +1127,29 @@
   border-radius: 7px;
   pointer-events: none;
   z-index: 9999;
+}
+
+/* ---- Single-view layouts (one pane fills the grid) ---- */
+.visualization-container.single-view {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  /* removed: transition: all 0.6s ease; — animating grid-template-* is unreliable across browsers and can leave the grid in an inconsistent state */
+}
+
+/* NOTE: single-view-2d intentionally has NO padding/box-sizing rule here.
+   The Report's 2D inset (top/right/bottom/left "breathing room" around the
+   floating glass panels) is applied per-pane via inline styles in
+   panelStyle() in VisualizationPage.tsx — using explicit width/height
+   calc() so it correctly overrides the `.visualization-container > div`
+   100%-size rule above. Adding container-level padding here too would
+   double-inset the image (shrink the container AND the pane within it),
+   reproducing the off-center/oversized CT bug we already fixed. The
+   rounded-corner + shadow treatment below is purely cosmetic and is safe
+   to keep since it doesn't affect sizing. */
+.visualization-container.single-view-2d .axial,
+.visualization-container.single-view-2d .sagittal,
+.visualization-container.single-view-2d .coronal {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 50px rgba(0,0,0,0.55);
 }

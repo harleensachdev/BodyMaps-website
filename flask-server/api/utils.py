@@ -7,6 +7,7 @@ from models.combined_labels import CombinedLabels
 from models.base import db
 from constants import Constants
 
+
 from io import BytesIO
 from datetime import datetime
 from reportlab.pdfgen import canvas
@@ -44,8 +45,12 @@ def combine_label_npz(index: int):
     npz_processor.combine_labels(index)
     return
 def get_panTS_id(index):
-    cur_case_id = str(index)
-    iter = max(0, 8 - len(str(index)))
+    index_str = str(index).strip()
+    if not re.fullmatch(r"\d+", index_str):
+        raise ValueError("Invalid case id: numeric value expected")
+
+    cur_case_id = index_str
+    iter = max(0, 8 - len(index_str))
     for _ in range(iter):
         cur_case_id = "0" + cur_case_id
     cur_case_id = "PanTS_" + cur_case_id    
@@ -339,12 +344,24 @@ def generate_pdf_with_template(
                 break
 
         # Title
-        temp_pdf.setFont("Helvetica-Bold", 26)
-        title_text = "MEDICAL REPORT"
-        title_width = temp_pdf.stringWidth(title_text, "Helvetica-Bold", 26)
-        temp_pdf.drawString((width - title_width) / 2, height - 70, title_text)
-        y_position = height - 100
-
+        # JHU Header
+        temp_pdf.setFillColorRGB(0, 0.18, 0.45)
+        temp_pdf.rect(0, height - 80, width, 80, fill=1, stroke=0)
+        temp_pdf.setFillColorRGB(1, 1, 1)
+        temp_pdf.setFont("Helvetica-Bold", 18)
+        title_text = "JOHNS HOPKINS UNIVERSITY"
+        title_width = temp_pdf.stringWidth(title_text, "Helvetica-Bold", 18)
+        temp_pdf.drawString((width - title_width) / 2, height - 35, title_text)
+        temp_pdf.setFont("Helvetica", 10)
+        sub_text = "Department of Radiology — AI-Generated Medical Report"
+        sub_width = temp_pdf.stringWidth(sub_text, "Helvetica", 10)
+        temp_pdf.drawString((width - sub_width) / 2, height - 52, sub_text)
+        temp_pdf.setFont("Helvetica", 8)
+        date_text = datetime.now().strftime("%B %d, %Y")
+        temp_pdf.drawString(left_margin, height - 68, f"Report Date: {date_text}")
+        temp_pdf.drawString(width - 150, height - 68, f"Case ID: {folder_name}")
+        temp_pdf.setFillColorRGB(0, 0, 0)
+        y_position = height - 95
         # Patient info
         temp_pdf.setFont("Helvetica-Bold", 12)
         temp_pdf.drawString(left_margin, y_position, "PATIENT INFORMATION")
@@ -357,6 +374,13 @@ def generate_pdf_with_template(
         write_wrapped_text(left_margin, y_position, f"Age: {age}")
         
         y_position = min(left_y, right_y) - section_spacing
+
+        # Technique
+        temp_pdf.setFont("Helvetica-Bold", 12)
+        temp_pdf.drawString(left_margin, y_position, "TECHNIQUE")
+        y_position -= line_height
+        y_position = write_wrapped_text(left_margin, y_position, f"Multiple axial CT images were obtained. Study type: {study_detail}. Contrast: {contrast}.")
+        y_position -= section_spacing
 
         # Imaging detail
         temp_pdf.setFont("Helvetica-Bold", 12)
@@ -373,7 +397,8 @@ def generate_pdf_with_template(
             scanner_info = "N/A"
 
 
-        y_position = write_wrapped_text(left_margin, y_position, f"Spacing: {spacing}")
+        spacing_clean = ", ".join([f"{float(s):.3f}" for s in spacing])
+        y_position = write_wrapped_text(left_margin, y_position, f"Spacing: {spacing_clean}")
         y_position = write_wrapped_text(left_margin, y_position, f"Shape: {shape}")
         y_position = write_wrapped_text(left_margin, y_position, f"Study type: {study_detail}")
         y_position = write_wrapped_text(left_margin, y_position, f"Contrast: {contrast}")
@@ -521,9 +546,82 @@ def generate_pdf_with_template(
             #     print('521')
             #     y_position -= 220
 
-        temp_pdf.save()
+        # COMMENTS section
+        y_position -= section_spacing
+        temp_pdf.setFont("Helvetica-Bold", 12)
+        temp_pdf.drawString(left_margin, y_position, "COMMENTS")
+        y_position -= line_height
 
+        # Build organ data string for LLM
+        organ_data_str = ""
+        for organ, label_id in LABELS.items():
+            if organ in NAME_TO_ORGAN and NAME_TO_ORGAN[organ] != organ:
+                continue
+            if label_id == 0:
+                continue
+            mask = (mask_array == label_id)
+            if not np.any(mask):
+                continue
+            volume = np.sum(mask) * voxel_volume
+            mean_hu = np.mean(ct_array[mask])
+            organ_data_str += f"{organ.replace('_', ' ')}: volume={volume:.2f}cc, mean HU={mean_hu:.1f}\n"
+
+        # Generate clinical comments using Ollama
+        try:
+            import ollama
+            prompt = f"""You are an expert radiologist writing a formal CT scan report COMMENTS section. Based on these AI organ measurements, write concise clinical observations in professional radiology language. Do NOT mention specific volume numbers or HU values — instead interpret them clinically. Keep it to 3-4 sentences total. Normal organs: one brief mention. Flag abnormal findings with possible diagnosis. Style: formal radiology prose, no bullet points.
+
+Organ measurements for clinical interpretation:
+{organ_data_str}
+
+Write only the clinical observations, 3-4 sentences, no headings:"""
+            
+            response = ollama.chat(model='llama3.2', messages=[
+                {'role': 'user', 'content': prompt}
+            ])
+            clinical_comments = response['message']['content']
+            y_position = write_wrapped_text(left_margin, y_position, clinical_comments)
+        except Exception as e:
+            print(f"[LLM ERROR] {e}")
+            y_position = write_wrapped_text(left_margin, y_position, "Clinical comments unavailable.")
+
+        # IMPRESSION section
+        # Generate clinical impression using LLM
+        try:
+            impression_data = ""
+            for organ, data in lession_volume_dict.items():
+                impression_data += f"{organ.replace('_', ' ')}: {data['number']} lesion(s), total volume {data['volume']:.2f} cc\n"
+            y_position -= section_spacing
+            temp_pdf.setFont("Helvetica-Bold", 12)
+            temp_pdf.drawString(left_margin, y_position, "IMPRESSION")
+            y_position -= line_height
+            if impression_data:
+                impression_prompt = f"""You are an expert radiologist. Based on these findings, write a formal IMPRESSION section for a CT report. Use numbered list format. Each item should be a concise clinical statement with recommendation if appropriate. Maximum 4 items. Professional radiology language only.
+
+Findings:
+{impression_data}
+Patient age: {age}, sex: {sex}
+
+Write numbered impression items only:"""
+                
+                imp_response = ollama.chat(model='llama3.2', messages=[
+                    {'role': 'user', 'content': impression_prompt}
+                ])
+                impression_text = imp_response['message']['content']
+                for line in impression_text.split('\n'):
+                    line = line.strip()
+                    if line:
+                        y_position = write_wrapped_text(left_margin, y_position, line)
+                        y_position -= 4
+            else:
+                y_position = write_wrapped_text(left_margin, y_position, "1. No significant lesions identified on AI segmentation.\n2. Clinical correlation recommended.")
+        except Exception as e:
+            print(f"[LLM IMPRESSION ERROR] {e}")
+            y_position = write_wrapped_text(left_margin, y_position, "1. No significant lesions identified.")
         # Merge with template
+        print("DEBUG: Saving temp PDF now")
+        temp_pdf.save()
+        print("DEBUG: Temp PDF saved!")
         template_reader =  PdfReader(template_pdf)
         content_reader = PdfReader(temp_pdf_path)
         writer = PdfWriter()
