@@ -447,6 +447,9 @@ def define_term():
 @api_blueprint.route('/get-report-data/<id>', methods=['GET'])
 def get_report_data(id):
     try:
+        if id is None or not str(id).isdigit():
+            return jsonify({"error": "Invalid id parameter"}), 400
+        id = str(int(id))
         # ── Try RadGPT structured report from metadata.xlsx first ─────────────
         # This uses Zongwei Zhou's own RadGPT model output — more accurate
         # than Ollama-generated impressions. Falls back to Ollama if not found.
