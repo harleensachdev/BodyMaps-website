@@ -557,27 +557,44 @@ export function setVisibilities(checkState: boolean[]) {
 };
 
 
-export function setToolGroupOpacity(opacityValue: number) {
-    const newSegConfig = { ...DEFAULT_SEGMENTATION_CONFIG };
-    newSegConfig.fillAlpha = opacityValue;
-    newSegConfig.fillAlphaInactive = opacityValue;
-    newSegConfig.outlineOpacity = opacityValue;
-    newSegConfig.outlineOpacityInactive = opacityValue;
-    segmentation.config.style.setStyle({
-        type: csToolsEnums.SegmentationRepresentations.Labelmap,
-        segmentationId: segmentationId,
-    }, {
-        ...DEFAULT_SEGMENTATION_CONFIG,
-        fillAlpha: opacityValue / 2.4,
-        fillAlphaInactive: opacityValue / 2.4,
-        outlineOpacity: opacityValue / 2.4,
-        outlineOpacityInactive: opacityValue / 2.4,
-
-    });
+// Fill (the solid organ color wash) and outline (the border traced around each segment)
+// are independently controllable — both 0–1. Previously a single "opacity" divided
+// whatever value it was given by 2.4 before applying it, so even 100% only ever reached
+// ~42% actual alpha; that division is gone. renderOutline defaults to false in
+// DEFAULT_SEGMENTATION_CONFIG (no border at all, regardless of outlineOpacity), so this
+// also flips it on/off based on whether the outline slider is above zero.
+// SegmentationStyle.setStyle merges onto the existing style by default (its `merge`
+// param defaults to true), so fill and outline can each be set independently without
+// either call needing to know the other's current value.
+function _setSegmentationStyle(style: Record<string, unknown>) {
+    segmentation.config.style.setStyle(
+        { type: csToolsEnums.SegmentationRepresentations.Labelmap, segmentationId },
+        style as Parameters<typeof segmentation.config.style.setStyle>[1]
+    );
     if (currentRenderingEngine) {
         currentRenderingEngine.renderViewports([viewportId1, viewportId2, viewportId3]);
         currentRenderingEngine.render();
     }
+}
+
+export function setFillOpacity(fillOpacity: number) {
+    _setSegmentationStyle({
+        renderFill: fillOpacity > 0,
+        fillAlpha: fillOpacity,
+        fillAlphaInactive: fillOpacity,
+    });
+}
+
+// renderOutline defaults to false in DEFAULT_SEGMENTATION_CONFIG (no border at all,
+// regardless of outlineOpacity), so this flips it on/off based on whether the slider
+// is above zero.
+export function setOutlineOpacity(outlineOpacity: number) {
+    _setSegmentationStyle({
+        renderOutline: outlineOpacity > 0,
+        outlineOpacity: outlineOpacity,
+        outlineOpacityInactive: outlineOpacity,
+        outlineWidth: DEFAULT_SEGMENTATION_CONFIG.outlineWidth,
+    });
 }
 
 export function toggleCrosshairTool(enable: boolean) {
@@ -873,11 +890,27 @@ const CINE_VIEWPORT_BY_PANE: Record<CinePane, string> = {
   coronal: viewportId3,
 };
 
-type CineCapableViewport = {
+// Every per-pane MPR operation (cine, flip, rotate, slice tracking) needs the same cast:
+// IViewport (what getViewport() is typed to return) only exposes the narrower base
+// Viewport surface, but the concrete object is a BaseVolumeViewport where all of this is
+// genuinely present at runtime — same rationale as getCrosshairMm's toolCenter cast
+// elsewhere in this file.
+type MprViewport = {
+  element: HTMLDivElement;
   scroll(delta?: number): void;
   getNumberOfSlices(): number;
   getSliceIndex(): number;
+  flip(flipDirection: { flipHorizontal?: boolean; flipVertical?: boolean }): void;
+  getRotation(): number;
+  setRotation(rotation: number): void;
+  render(): void;
 };
+
+function _getMprViewport(pane: CinePane): MprViewport | undefined {
+  const engine = getRenderingEngine(renderingEngineId);
+  if (!engine) return undefined;
+  return engine.getViewport(CINE_VIEWPORT_BY_PANE[pane]) as unknown as MprViewport | undefined;
+}
 
 let _cineIntervalId: number | null = null;
 
@@ -886,9 +919,7 @@ export function startCine(pane: CinePane, fps = 12): boolean {
   if (!engine) return false;
   stopCine(); // one clip at a time
   try {
-    const viewport = engine.getViewport(CINE_VIEWPORT_BY_PANE[pane]) as unknown as
-      | CineCapableViewport
-      | undefined;
+    const viewport = _getMprViewport(pane);
     if (!viewport) return false;
     const numSlices = viewport.getNumberOfSlices();
     if (!numSlices || numSlices < 2) return false;
@@ -915,33 +946,14 @@ export function stopCine() {
 // ---------------------------------------------------------------------------
 // Per-pane flip / rotate — like Cine, these act on whichever pane is currently
 // "in focus" (VisualizationPage tracks that via scroll/click and passes it in).
-// flip()/getRotation()/setRotation() exist on BaseVolumeViewport but IViewport
-// (what getViewport() is typed to return) only exposes the narrower base
-// Viewport surface, so — same as elsewhere in this file (e.g. getCrosshairMm's
-// toolCenter cast) — the viewport is cast to a minimal interface for the calls
-// that are genuinely there at runtime but not on the public IViewport type.
 // ---------------------------------------------------------------------------
-type TransformableViewport = {
-  flip(flipDirection: { flipHorizontal?: boolean; flipVertical?: boolean }): void;
-  getRotation(): number;
-  setRotation(rotation: number): void;
-  render(): void;
-};
-
-function _getTransformableViewport(pane: CinePane): TransformableViewport | undefined {
-  const engine = getRenderingEngine(renderingEngineId);
-  if (!engine) return undefined;
-  return engine.getViewport(CINE_VIEWPORT_BY_PANE[pane]) as unknown as
-    | TransformableViewport
-    | undefined;
-}
 
 // Mirrors the pane left-right. flip() toggles internally (this.flipHorizontal =
 // !this.flipHorizontal), so calling it again on the same pane un-flips it — the
 // toggle behavior lives in Cornerstone itself, nothing to track on our side.
 // It also self-renders, unlike setRotation below.
 export function flipPaneHorizontal(pane: CinePane): void {
-  const viewport = _getTransformableViewport(pane);
+  const viewport = _getMprViewport(pane);
   if (!viewport) return;
   try {
     viewport.flip({ flipHorizontal: true });
@@ -956,7 +968,7 @@ export function flipPaneHorizontal(pane: CinePane): void {
 // case turns out to visibly rotate counter-clockwise instead, flip the `+ 90`
 // below to `- 90` (mod still needs the `+ 360` to stay positive in that case).
 export function rotatePane90Clockwise(pane: CinePane): void {
-  const viewport = _getTransformableViewport(pane);
+  const viewport = _getMprViewport(pane);
   if (!viewport) return;
   try {
     const next = (viewport.getRotation() + 90) % 360;
@@ -968,6 +980,48 @@ export function rotatePane90Clockwise(pane: CinePane): void {
   } catch (e) {
     console.warn(`Rotate failed for pane "${pane}":`, e);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Slice tracking — drives the per-pane "245/519" caption + drag scrollbar.
+// ---------------------------------------------------------------------------
+
+export type SliceInfo = { current: number; total: number };
+
+// Jumps a pane directly to an arbitrary slice (the scrollbar drag target), rather than
+// the +1/-1 steps cine/wheel-scroll use. scroll(delta) clamps to the valid range, so an
+// out-of-range index (e.g. from a stale `total`) is harmless.
+export function setPaneSliceIndex(pane: CinePane, index: number): void {
+  const viewport = _getMprViewport(pane);
+  if (!viewport) return;
+  const delta = index - viewport.getSliceIndex();
+  if (delta !== 0) viewport.scroll(delta);
+}
+
+// Fires `cb` once immediately per pane (so the caller has an initial reading) and again
+// on every CAMERA_MODIFIED where the slice index actually changed — pan/zoom/rotate also
+// fire that event, so each pane's last-seen index is compared to avoid spamming the
+// caller (and the React state it likely feeds) on every unrelated camera tweak. Returns
+// an unsubscribe function; call it before the volume/tool group is torn down (case
+// switch, HD reload) since the viewport elements go with it.
+export function subscribeToSliceChanges(cb: (pane: CinePane, info: SliceInfo) => void): () => void {
+  const panes = Object.keys(CINE_VIEWPORT_BY_PANE) as CinePane[];
+  const cleanups: (() => void)[] = [];
+  for (const pane of panes) {
+    const viewport = _getMprViewport(pane);
+    if (!viewport) continue;
+    let lastIndex = viewport.getSliceIndex();
+    cb(pane, { current: lastIndex, total: viewport.getNumberOfSlices() });
+    const handler = () => {
+      const current = viewport.getSliceIndex();
+      if (current === lastIndex) return;
+      lastIndex = current;
+      cb(pane, { current, total: viewport.getNumberOfSlices() });
+    };
+    viewport.element.addEventListener(Enums.Events.CAMERA_MODIFIED, handler);
+    cleanups.push(() => viewport.element.removeEventListener(Enums.Events.CAMERA_MODIFIED, handler));
+  }
+  return () => cleanups.forEach((fn) => fn());
 }
 
 // Undo any oblique-plane rotation / slab thickness back to standard orthogonal

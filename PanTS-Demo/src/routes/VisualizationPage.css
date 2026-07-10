@@ -87,6 +87,19 @@
   overflow: hidden;
 }
 
+/* Wraps each MPR pane so slice/window overlays can sit as DOM siblings of the
+   Cornerstone-owned pane div, never as its children (Cornerstone manages that div's
+   contents imperatively; mixing React children into the same node risks the two
+   fighting over the same nodes). The wrapper is now the grid item — sized by the grid
+   itself, same as the bare pane div was before — so the pane div just fills it. */
+.vp-pane-wrap {
+  position: relative;
+}
+.vp-pane-wrap > div:first-child {
+  width: 100%;
+  height: 100%;
+}
+
 .report-container button {
   margin: 5px;
   background-color: #222;       /* 深灰色背景 */
@@ -783,6 +796,85 @@
 /* "Hover to identify" active: a distinct cursor hints the pane now reports the
    organ under the pointer instead of just navigating. */
 .vp-pane--hover-identify { cursor: help; }
+
+/* ---- Per-pane slice scrollbar + "current/total" caption (bottom right) ---- */
+/* A horizontal <input type="range"> rotated into a vertical scrollbar pinned to the
+   pane's right edge. Rotation happens around the element's own center, so its layout
+   box (before rotation) is sized/positioned as if horizontal — width below becomes the
+   rendered height. */
+.vp-slice-scrollbar {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 6;
+  width: 65%;
+  max-width: 220px;
+  height: 4px;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center center;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+.vp-slice-scrollbar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.vp-slice-scrollbar::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.vp-slice-caption {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  font-family: var(--vp-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(14, 15, 18, 0.72);
+  border: 1px solid var(--vp-border);
+  border-radius: 6px;
+  padding: 3px 7px;
+  pointer-events: none;
+}
+
+/* ---- W/L readout (bottom left) — briefly shown while the brightness/contrast
+   sliders or a preset are actively changing the window, then fades back out. ---- */
+.vp-window-readout {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 6;
+  font-family: var(--vp-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(14, 15, 18, 0.72);
+  border: 1px solid var(--vp-border);
+  border-radius: 6px;
+  padding: 3px 7px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.vp-window-readout--visible {
+  opacity: 1;
+}
 
 /* ---- Loading overlay (lightweight; no WebGL so it never competes with the
    viewer's NiiVue/Cornerstone contexts) ---- */

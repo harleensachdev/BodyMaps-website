@@ -5,7 +5,7 @@ import {
   ROI_TOOL,
   moveCornerstoneCrosshairToMm,
   getOrganCentroids,
-  setToolGroupOpacity,
+  setFillOpacity,
   setZoom as csSetZoom,
   zoomToFit as csZoomToFit,
 } from "../../helpers/CornerstoneNifti2";
@@ -135,7 +135,7 @@ export function buildViewerActions(opts: {
     setOpacity(value) {
       const clamped = Math.max(0, Math.min(100, value));
       setOpacityValue(clamped);
-      setToolGroupOpacity(clamped / 100);
+      setFillOpacity(clamped / 100);
     },
 
     setWindow(width, center) {

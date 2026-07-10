@@ -79,14 +79,17 @@ import {
     rotatePane90Clockwise,
     setActiveMaskEditTool,
     setActiveMeasurementTool,
+    setFillOpacity,
+    setOutlineOpacity,
+    setPaneSliceIndex,
     setReferenceLinesEnabled,
-    setToolGroupOpacity,
     setVisibilities,
     setZoom,
     startCine,
     stopCine,
     subscribeToCrosshairChanges,
     subscribeToMeasurementChanges,
+    subscribeToSliceChanges,
     subscribeToVolumeProgress,
     toggleCrosshairTool,
     undoMaskEdit,
@@ -96,7 +99,8 @@ import {
     zoomToFit,
     type CinePane,
     type MeasurementToolName,
-    type PrimaryMouseToolName
+    type PrimaryMouseToolName,
+    type SliceInfo
 } from "../helpers/CornerstoneNifti2";
 import { getLocalDicomFiles, loadLocalDicomSeries } from "../helpers/dicomLocal";
 import { downloadUrlAsFile } from "../helpers/downloadFile";
@@ -236,17 +240,31 @@ function VisualizationPage() {
 	const VisualizationContainer_ref = useRef(null);
 	//   const lastClickInfoRef = useRef(null);
 
-	//   const [sliceAxial, setSliceAxial] = useState(0);
-	//   const [sliceSagittal, setSliceSagittal] = useState(0);
-	//   const [sliceCoronal, setSliceCoronal] = useState(0);
 	const [checkState, setCheckState] = useState<boolean[]>([true]);
 	const [NV, _setNV] = useState<Niivue | undefined>();
 	const [checkBoxData, setCheckBoxData] = useState<CheckBoxData[]>([]);
+	// Fill (solid color wash) and outline (border) opacity are independent sliders — see
+	// setFillOpacity/setOutlineOpacity. Outline defaults to 0 (off), matching how the mask
+	// looked before this split existed (borders were never actually rendered).
 	const [opacityValue, setOpacityValue] = useState(
 		APP_CONSTANTS.DEFAULT_SEGMENTATION_OPACITY * 100
 	);
+	const [outlineOpacityValue, setOutlineOpacityValue] = useState(0);
+	// Current/total slice per MPR pane, for the "245/519" caption + drag scrollbar.
+	// Populated by subscribeToSliceChanges once the volume is ready; null until then.
+	const [sliceInfo, setSliceInfo] = useState<Record<CinePane, SliceInfo | null>>({
+		axial: null,
+		sagittal: null,
+		coronal: null,
+	});
 	const [windowWidth, setWindowWidth] = useState(400);
 	const [windowCenter, setWindowCenter] = useState(50);
+	// Brief W/L readout: shown only while the user is actively dragging the brightness/
+	// contrast sliders or picking a preset — not on the initial/deep-link window apply, and
+	// not left on screen indefinitely. windowReadoutTimerRef holds the fade-out timeout so
+	// each new change can restart it instead of stacking timers.
+	const [windowReadoutVisible, setWindowReadoutVisible] = useState(false);
+	const windowReadoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [renderingEngine, setRenderingEngine] =
 		useState<RenderingEngine | null>(null);
 	const [viewportIds, setViewportIds] = useState<string[]>([]);
@@ -619,6 +637,9 @@ function VisualizationPage() {
 		setCinePlaying(false);
 	}, [viewMode]);
 	useEffect(() => () => stopCine(), []);
+	useEffect(() => () => {
+		if (windowReadoutTimerRef.current) clearTimeout(windowReadoutTimerRef.current);
+	}, []);
 
 	// Keyboard shortcuts (skipped while typing): L/B/A/P/R/E/T measurement tools,
 	// G magnify, C crosshair, S snapshot, M measurements panel, V cine,
@@ -1003,6 +1024,19 @@ function VisualizationPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [renderingEngine, viewportIds, volumeId]);
 
+	// Track each pane's current/total slice for the "245/519" caption + drag scrollbar.
+	// Re-subscribes on every volume (re)load, since a fresh render tears down the old
+	// viewport elements the previous subscription's listeners were attached to.
+	useEffect(() => {
+		if (!renderingEngine || !viewportIds.length || !volumeId) return;
+		const unsubscribe = subscribeToSliceChanges((pane, info) => {
+			setSliceInfo((prev) => (prev[pane]?.current === info.current && prev[pane]?.total === info.total
+				? prev
+				: { ...prev, [pane]: info }));
+		});
+		return unsubscribe;
+	}, [renderingEngine, viewportIds, volumeId]);
+
 	// Apply the reference-lines toggle once the engine/viewports/volume are ready, and
 	// re-apply on both a user toggle and a volume reload (a fresh tool group always starts
 	// with every tool disabled).
@@ -1035,7 +1069,7 @@ function VisualizationPage() {
 		if (shared.ww != null && shared.wc != null) handleWindowChange(shared.ww, shared.wc);
 		if (shared.opacity != null) {
 			setOpacityValue(shared.opacity);
-			setToolGroupOpacity(shared.opacity / 100);
+			setFillOpacity(shared.opacity / 100);
 		}
 		if (shared.hidden?.length) {
 			// The checkState effect below applies the visibility change (Cornerstone + NiiVue).
@@ -1162,7 +1196,17 @@ function VisualizationPage() {
 	const handlePresetClick = (preset: typeof CT_PRESETS[number]) => {
 		setActivePreset(preset.name);
 		handleWindowChange(preset.width, preset.center);
+		showWindowReadoutBriefly();
 		sessionRef.current?.log("preset", `Applied ${preset.name} window`);
+	};
+
+	// Shows the W/L readout and (re)starts its fade-out timer. Called only from actual
+	// user interaction (brightness/contrast sliders, presets) — not from the initial-load
+	// or deep-link window apply, which shouldn't pop the readout unprompted.
+	const showWindowReadoutBriefly = () => {
+		setWindowReadoutVisible(true);
+		if (windowReadoutTimerRef.current) clearTimeout(windowReadoutTimerRef.current);
+		windowReadoutTimerRef.current = setTimeout(() => setWindowReadoutVisible(false), 2000);
 	};
 
 	const panelStyle = (panel: "axial" | "sagittal" | "coronal" | "3d"): React.CSSProperties => {
@@ -1176,6 +1220,39 @@ function VisualizationPage() {
 		}
 		// 2D single view: collapse the grid to one cell and hide the rest.
 		return viewMode === panel ? {} : { display: "none" };
+	};
+
+	// Overlay UI for one MPR pane: the slice drag-scrollbar + "245/519" caption (bottom
+	// right, only once slice info has arrived for that pane), and the W/L readout (bottom
+	// left, only while showWindowReadoutBriefly's fade timer hasn't expired). Rendered as
+	// siblings of the Cornerstone-owned pane div, inside the shared .vp-pane-wrap — never
+	// as children of that div itself, since Cornerstone manages its children imperatively
+	// and mixing React-rendered children into the same node risks the two fighting over
+	// the same DOM nodes.
+	const renderPaneOverlays = (pane: CinePane) => {
+		const info = sliceInfo[pane];
+		return (
+			<>
+				{info && info.total > 1 && (
+					<>
+						<input
+							type="range"
+							className="vp-slice-scrollbar"
+							min={0}
+							max={info.total - 1}
+							step={1}
+							value={info.current}
+							onChange={(e) => setPaneSliceIndex(pane, Number(e.target.value))}
+							aria-label={`${pane} slice`}
+						/>
+						<div className="vp-slice-caption">{info.current + 1}/{info.total}</div>
+					</>
+				)}
+				<div className={`vp-window-readout${windowReadoutVisible ? " vp-window-readout--visible" : ""}`}>
+					W {Math.round(windowWidth)} · L {Math.round(windowCenter)}
+				</div>
+			</>
+		);
 	};
 
 	// Update segmentation visibility when state changes
@@ -1206,9 +1283,17 @@ function VisualizationPage() {
 	) => {
 		const value = Number(event.target.value);
 		setOpacityValue(value);
-		setToolGroupOpacity(value / 100);
-		sessionRef.current?.log("opacity", `Mask opacity set to ${value}%`, 1200);
-		// updateGeneralOpacity(render_ref, value / 100);
+		setFillOpacity(value / 100);
+		sessionRef.current?.log("opacity", `Fill opacity set to ${value}%`, 1200);
+	};
+
+	const handleOutlineOpacityChange = (
+		event: React.ChangeEvent<HTMLInputElement>
+	) => {
+		const value = Number(event.target.value);
+		setOutlineOpacityValue(value);
+		setOutlineOpacity(value / 100);
+		sessionRef.current?.log("opacity", `Border opacity set to ${value}%`, 1200);
 	};
 
 
@@ -1455,16 +1540,28 @@ const flaggedOrgans = useMemo(() => summarizeOutOfRange(statRows), [statRows]);
 					{/* Compact adjustments: opacity, brightness, contrast, zoom */}
 					<div className="vp-tb-adjust">
 						{!isDicom && (
-							<label className="vp-tb-slider" title="Mask opacity">
-								<span className="vp-tb-slider__label">Opac</span>
-								<input
-									type="range" min="0" max="100" step="1" className="vp-range"
-									aria-label="Label opacity"
-									value={opacityValue}
-									onChange={handleOpacityOnSliderChange}
-								/>
-								<span className="vp-tb-slider__val">{Math.round(opacityValue)}%</span>
-							</label>
+							<>
+								<label className="vp-tb-slider" title="Mask fill opacity">
+									<span className="vp-tb-slider__label">Fill</span>
+									<input
+										type="range" min="0" max="100" step="1" className="vp-range"
+										aria-label="Mask fill opacity"
+										value={opacityValue}
+										onChange={handleOpacityOnSliderChange}
+									/>
+									<span className="vp-tb-slider__val">{Math.round(opacityValue)}%</span>
+								</label>
+								<label className="vp-tb-slider" title="Mask border opacity">
+									<span className="vp-tb-slider__label">Border</span>
+									<input
+										type="range" min="0" max="100" step="1" className="vp-range"
+										aria-label="Mask border opacity"
+										value={outlineOpacityValue}
+										onChange={handleOutlineOpacityChange}
+									/>
+									<span className="vp-tb-slider__val">{Math.round(outlineOpacityValue)}%</span>
+								</label>
+							</>
 						)}
 						<label className="vp-tb-slider" title="Brightness (window level)">
 							<span className="vp-tb-slider__label">Brt</span>
@@ -1472,7 +1569,10 @@ const flaggedOrgans = useMemo(() => summarizeOutOfRange(statRows), [statRows]);
 								type="range" min="-1000" max="1000" step="1" className="vp-range"
 								aria-label="Brightness"
 								value={windowCenter * -1}
-								onChange={(e) => handleWindowChange(null, Number(e.target.value) * -1)}
+								onChange={(e) => {
+									handleWindowChange(null, Number(e.target.value) * -1);
+									showWindowReadoutBriefly();
+								}}
 							/>
 						</label>
 						<label className="vp-tb-slider" title="Contrast (window width)">
@@ -1481,7 +1581,10 @@ const flaggedOrgans = useMemo(() => summarizeOutOfRange(statRows), [statRows]);
 								type="range" min="1" max="2000" step="1" className="vp-range"
 								aria-label="Contrast"
 								value={windowWidth}
-								onChange={(e) => handleWindowChange(Number(e.target.value), null)}
+								onChange={(e) => {
+									handleWindowChange(Number(e.target.value), null);
+									showWindowReadoutBriefly();
+								}}
 							/>
 						</label>
 						<label className="vp-tb-slider" title="Zoom">
@@ -1979,40 +2082,46 @@ const flaggedOrgans = useMemo(() => summarizeOutOfRange(statRows), [statRows]);
 							: {}),
 					}}
 				>
-					<div
-						className={`axial ${loading ? "" : "vp-pane vp-pane--axial"}${hoverIdentifyEnabled ? " vp-pane--hover-identify" : ""}`}
-						data-label="Axial"
-						ref={axial_ref}
-						style={panelStyle("axial")}
-						onClick={(e) => { handleMouseClick(e); }}
-						onMouseDown={handlePaneMouseDown("axial")}
-						onMouseMove={handlePaneHover("axial")}
-						onMouseLeave={handlePaneHoverLeave}
-						onWheel={handlePaneWheel("axial")}
-					></div>
-					<div
-						className={`sagittal ${loading ? "" : "vp-pane vp-pane--sagittal"}${hoverIdentifyEnabled ? " vp-pane--hover-identify" : ""}`}
-						data-label="Sagittal"
-						ref={sagittal_ref}
-						style={panelStyle("sagittal")}
-						onClick={(e) => { handleMouseClick(e); }}
-						onMouseDown={handlePaneMouseDown("sagittal")}
-						onMouseMove={handlePaneHover("sagittal")}
-						onMouseLeave={handlePaneHoverLeave}
-						onWheel={handlePaneWheel("sagittal")}
-					></div>
+					<div className="vp-pane-wrap" style={panelStyle("axial")}>
+						<div
+							className={`axial ${loading ? "" : "vp-pane vp-pane--axial"}${hoverIdentifyEnabled ? " vp-pane--hover-identify" : ""}`}
+							data-label="Axial"
+							ref={axial_ref}
+							onClick={(e) => { handleMouseClick(e); }}
+							onMouseDown={handlePaneMouseDown("axial")}
+							onMouseMove={handlePaneHover("axial")}
+							onMouseLeave={handlePaneHoverLeave}
+							onWheel={handlePaneWheel("axial")}
+						></div>
+						{!loading && renderPaneOverlays("axial")}
+					</div>
+					<div className="vp-pane-wrap" style={panelStyle("sagittal")}>
+						<div
+							className={`sagittal ${loading ? "" : "vp-pane vp-pane--sagittal"}${hoverIdentifyEnabled ? " vp-pane--hover-identify" : ""}`}
+							data-label="Sagittal"
+							ref={sagittal_ref}
+							onClick={(e) => { handleMouseClick(e); }}
+							onMouseDown={handlePaneMouseDown("sagittal")}
+							onMouseMove={handlePaneHover("sagittal")}
+							onMouseLeave={handlePaneHoverLeave}
+							onWheel={handlePaneWheel("sagittal")}
+						></div>
+						{!loading && renderPaneOverlays("sagittal")}
+					</div>
 
-					<div
-						className={`coronal ${loading ? "" : "vp-pane vp-pane--coronal"}${hoverIdentifyEnabled ? " vp-pane--hover-identify" : ""}`}
-						data-label="Coronal"
-						ref={coronal_ref}
-						style={panelStyle("coronal")}
-						onClick={(e) => { handleMouseClick(e); }}
-						onMouseDown={handlePaneMouseDown("coronal")}
-						onMouseMove={handlePaneHover("coronal")}
-						onMouseLeave={handlePaneHoverLeave}
-						onWheel={handlePaneWheel("coronal")}
-					></div>
+					<div className="vp-pane-wrap" style={panelStyle("coronal")}>
+						<div
+							className={`coronal ${loading ? "" : "vp-pane vp-pane--coronal"}${hoverIdentifyEnabled ? " vp-pane--hover-identify" : ""}`}
+							data-label="Coronal"
+							ref={coronal_ref}
+							onClick={(e) => { handleMouseClick(e); }}
+							onMouseDown={handlePaneMouseDown("coronal")}
+							onMouseMove={handlePaneHover("coronal")}
+							onMouseLeave={handlePaneHoverLeave}
+							onWheel={handlePaneWheel("coronal")}
+						></div>
+						{!loading && renderPaneOverlays("coronal")}
+					</div>
 
 					<div className={`render ${loading ? "" : "vp-pane vp-pane--render"}`} data-label="3D" style={panelStyle("3d")}>
 						<div className="canvas">
