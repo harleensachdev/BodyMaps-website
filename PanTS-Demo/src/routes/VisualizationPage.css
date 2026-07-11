@@ -36,19 +36,40 @@
   background-color: grey;
 }
 
+/* Body row under the toolbar: left dock (Organs) · stage · right docks (stats /
+   measurements / mask edit / AI). Docked panels are in NORMAL FLOW — they push the
+   stage narrower instead of overlaying the viewports, the same way the toolbar
+   above pushes them down. The stage's ResizeObserver refits the canvases whenever
+   a dock opens or closes. */
+.vp-body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The stage holds the viewports and fills whatever width/height is left beside
+   the docks (it flexes). position:relative anchors the absolutely-filled container. */
+.vp-stage {
+  flex: 1 1 auto;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
+
 .visualization-container {
-  grid-column: 2;
-  grid-row: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  width: 100vw;
-  height: 100vh;
   gap: 2px;
   background: #000;
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .canvas {
@@ -329,6 +350,224 @@
   border-color: var(--vp-border-strong);
 }
 
+/* ============================================================
+   Top toolbar (PYCAD-style). A single horizontal strip in normal
+   flow so it pushes the viewports down instead of overlaying them.
+   ============================================================ */
+.vp-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+  padding: 12px 20px;
+  background: rgba(14, 15, 18, 0.92);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--vp-border);
+  font-family: var(--vp-font);
+  position: relative;
+  z-index: 40;
+}
+
+/* Floating gear shown only when the toolbar is hidden. */
+.vp-floating-gear {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  z-index: 55;
+}
+
+/* Shaded volume-rendering target: Cornerstone owns the canvas inside. */
+.vp-vol3d {
+  width: 100%;
+  height: 100%;
+}
+
+/* 3D pane footer bar: Meshes/Volume mode toggle + volume presets. */
+.vp-3dbar {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100% - 24px);
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: rgba(14, 15, 18, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--vp-border);
+}
+.vp-3dbar__btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--vp-text-dim);
+  font-family: var(--vp-font);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.vp-3dbar__btn:hover { color: var(--vp-text); }
+.vp-3dbar__btn.is-active {
+  background: #ffffff;
+  color: #08090b;
+}
+.vp-3dbar__presets {
+  display: flex;
+  gap: 3px;
+  padding-left: 6px;
+  border-left: 1px solid var(--vp-border);
+}
+.vp-3dbar__btn--preset {
+  font-size: 10.5px;
+  padding: 4px 8px;
+  font-family: var(--vp-mono);
+  font-weight: 500;
+}
+
+/* HD button while the full-res volume streams in the background. */
+.vp-tool--busy {
+  border-color: rgba(110, 168, 254, 0.55);
+  animation: vp-hd-pulse 1.6s ease-in-out infinite;
+}
+@keyframes vp-hd-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(110, 168, 254, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(110, 168, 254, 0); }
+}
+
+/* 3D pane placeholder for local DICOM (no segmentation → no meshes). */
+.vp-3d-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--vp-font);
+  font-size: 13px;
+  color: var(--vp-text-dim);
+}
+.vp-3d-empty span {
+  font-size: 11.5px;
+  color: var(--vp-text-faint);
+}
+
+/* Case / session identity block at the toolbar's left. */
+.vp-tb-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+.vp-tb-id__eyebrow {
+  font-family: var(--vp-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--vp-text-faint);
+}
+.vp-tb-id__val {
+  font-family: var(--vp-font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--vp-text);
+}
+
+.vp-tb-divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 26px;
+  background: var(--vp-border);
+  margin: 0 6px;
+}
+
+/* Segmented controls in the bar sit in one row and size to content. */
+.vp-tb-seg {
+  flex-wrap: nowrap;
+}
+.vp-topbar .vp-seg__btn {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  font-size: 11.5px;
+}
+
+/* Compact adjustment sliders (opacity / brightness / contrast / zoom). */
+.vp-tb-adjust {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.vp-tb-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.vp-tb-slider__label {
+  font-family: var(--vp-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vp-text-faint);
+}
+.vp-tb-slider .vp-range {
+  width: 74px;
+}
+.vp-tb-slider__val {
+  font-family: var(--vp-mono);
+  font-size: 10.5px;
+  color: var(--vp-text-dim);
+  min-width: 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.vp-tb-mini {
+  font-family: var(--vp-font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vp-text-dim);
+  background: var(--vp-panel-strong);
+  border: 1px solid var(--vp-border);
+  border-radius: 7px;
+  padding: 5px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.vp-tb-mini:hover {
+  color: var(--vp-text);
+  border-color: var(--vp-border-strong);
+}
+
+/* Tool icon buttons in the bar: slightly smaller, left-aligned, tooltips below. */
+.vp-tb-tools {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+}
+.vp-topbar .vp-tool {
+  width: 36px;
+  height: 36px;
+}
+.vp-topbar .vp-tool__tip {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform-origin: top center;
+}
+.vp-topbar .vp-tool__caret {
+  right: 3px;
+  bottom: 3px;
+}
+
 /* ---- Tool row (crosshair / download / report) ---- */
 .vp-toolrow {
   display: flex;
@@ -437,6 +676,30 @@
   background: #ffffff;
   color: #08090b;
 }
+/* keyboard-shortcut hint at the right edge of a flyout item */
+.vp-flyout__kbd {
+  margin-left: auto;
+  padding-left: 14px;
+  font-family: var(--vp-mono);
+  font-size: 10px;
+  color: var(--vp-text-faint);
+}
+.vp-flyout__item.is-active .vp-flyout__kbd { color: inherit; }
+
+/* Reading-session toolbar button while recording: red + pulsing */
+.vp-tool--rec {
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(244, 63, 94, 0.55);
+  animation: vp-rec-btn-pulse 1.6s ease-in-out infinite;
+}
+.vp-tool--rec:hover {
+  background: rgba(244, 63, 94, 0.3);
+  border-color: rgba(244, 63, 94, 0.7);
+}
+@keyframes vp-rec-btn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(244, 63, 94, 0); }
+}
 
 /* ---- Viewports: subtle accent ring + corner orientation label ---- */
 .vp-pane {
@@ -474,6 +737,9 @@
 .vp-pane--sagittal { --pane-accent: #eab308; }
 .vp-pane--coronal  { --pane-accent: #22c55e; }
 .vp-pane--render   { --pane-accent: #6ea8fe; }
+/* Solid fill so the fullscreen 3D overlay (viewMode "3d") never shows the MPR
+   grid bleeding through while the mesh/volume view is still initializing. */
+.vp-pane--render, .vp-pane--render .canvas { background: var(--vp-bg, #08090b); }
 
 /* ---- Loading overlay (lightweight; no WebGL so it never competes with the
    viewer's NiiVue/Cornerstone contexts) ---- */
@@ -567,14 +833,21 @@
 }
 
 /* ---- Organs / Class Map panel (left side) ---- */
+/* Docked left of the stage (in flow). Hidden with display (not a slide transform)
+   so it keeps its mounted state without occupying space when closed. */
 .vp-organs {
+  display: none;
+  flex: 0 0 288px;
+  min-height: 0;
   font-family: var(--vp-font);
   background: rgba(14, 15, 18, 0.94);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border-right: 1px solid var(--vp-border);
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
   color: var(--vp-text);
+}
+.vp-organs--open {
+  display: flex;
 }
 .vp-organs__title {
   font-family: var(--vp-font);
@@ -674,22 +947,17 @@
   border-color: var(--vp-accent);
 }
 
-/* ---- Organ statistics panel (right side) ---- */
+/* ---- Organ statistics panel — docked right of the stage (in flow, not overlay) ---- */
 .vp-stats {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  bottom: 16px;
-  width: 300px;
-  z-index: 48;
+  flex: 0 0 350px;
+  width: 350px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: rgba(14, 15, 18, 0.92);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border: 1px solid var(--vp-border);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+  border-left: 1px solid var(--vp-border);
   font-family: var(--vp-font);
   overflow: hidden;
 }
@@ -699,6 +967,26 @@
   justify-content: space-between;
   padding: 14px 16px;
   border-bottom: 1px solid var(--vp-border);
+}
+.vp-stats__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vp-stats__export {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--vp-border);
+  color: var(--vp-text-dim);
+  font-family: var(--vp-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  border-radius: 6px;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+.vp-stats__export:hover {
+  color: var(--vp-text);
+  background: rgba(255, 255, 255, 0.12);
 }
 .vp-stats__close {
   background: transparent;
@@ -710,6 +998,18 @@
   padding: 0 4px;
 }
 .vp-stats__close:hover { color: var(--vp-text); }
+/* Out-of-range summary banner above the table. */
+.vp-stats__summary {
+  margin: 10px 12px 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 180, 84, 0.1);
+  border: 1px solid rgba(255, 180, 84, 0.28);
+  color: #ffce9a;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.vp-stats__summary strong { color: #ffb454; }
 .vp-stats__msg {
   padding: 24px 16px;
   font-family: var(--vp-mono);
@@ -737,13 +1037,63 @@
   font-size: 12.5px;
   color: var(--vp-text);
 }
+/* 4-column layout when the population percentile column is present. */
+.vp-stats__table--pct .vp-stats__row {
+  grid-template-columns: 1.15fr 0.8fr 0.55fr 0.85fr;
+  gap: 6px;
+}
 .vp-stats__row span:nth-child(2),
-.vp-stats__row span:nth-child(3) {
+.vp-stats__row span:nth-child(3),
+.vp-stats__row span:nth-child(4) {
   font-family: var(--vp-mono);
   font-size: 11px;
   color: var(--vp-text-dim);
   text-align: right;
 }
+/* Percentile cell: number stacked over a tiny distribution sparkline. */
+.vp-stats__pct {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.vp-stats__pctnum {
+  font-family: var(--vp-mono);
+  font-size: 11px;
+}
+/* Muted by default, highlighted when in the extreme tails (<p5 / >p95). */
+.vp-stats__pct--flag {
+  color: #ffb454 !important;
+  font-weight: 600;
+}
+/* Percentile sparkline: 0–100 track, p5–p95 band shaded, marker at the case value. */
+.vp-spark {
+  position: relative;
+  width: 100%;
+  max-width: 52px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.vp-spark__band {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.vp-spark__marker {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transform: translate(-50%, -50%);
+}
+.vp-spark__marker--flag { background: #ffb454; }
 .vp-stats__row:not(.vp-stats__row--head):nth-child(odd) {
   background: rgba(255, 255, 255, 0.03);
 }

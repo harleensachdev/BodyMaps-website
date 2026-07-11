@@ -29,7 +29,6 @@ type Props = {
 	setCheckState: React.Dispatch<React.SetStateAction<boolean[]>>;
 	checkState: boolean[];
 	sessionId: string | undefined;
-	setShowTaskDetails: React.Dispatch<React.SetStateAction<boolean>>;
 	setShowOrganDetails: React.Dispatch<React.SetStateAction<boolean>>;
 	showOrganDetails: boolean;
 	onJumpToOrgan?: (label: number) => void;
@@ -237,7 +236,6 @@ function OrganCheckbox({
 	setCheckState,
 	checkState,
 	labelColorMap,
-	setShowTaskDetails,
 	setShowOrganDetails,
 	showOrganDetails,
 	onJumpToOrgan,
@@ -255,21 +253,20 @@ function OrganCheckbox({
 		});
 	};
 
+	// Docked in the viewer's body row (left of the stage), not a fixed overlay.
+	// Kept mounted with display toggled so the expand/collapse state survives.
 	return (
 		<div
-			className={`vp-organs flex flex-col gap-4 w-72 h-screen pt-16 px-4 pb-4 z-40 fixed top-0 left-0 duration-200 transition-all ${
-				showOrganDetails ? "translate-x-0" : "-translate-x-full"
-			} origin-left`}
+			className={`vp-organs flex-col gap-4 w-72 px-4 pb-4 pt-4 ${
+				showOrganDetails ? "vp-organs--open" : ""
+			}`}
 		>
 			<div className="flex justify-between items-center w-full">
 
 			<div className="flex gap-2 items-center justify-start">
 				<IconArrowLeft
 					className="vp-organs__back"
-					onClick={() => {
-						setShowTaskDetails(false);
-						setShowOrganDetails(false);
-					}}
+					onClick={() => setShowOrganDetails(false)}
 					/>
 			<div className="vp-organs__title">Organs</div>
 			</div>

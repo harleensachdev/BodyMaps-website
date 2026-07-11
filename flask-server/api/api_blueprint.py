@@ -1,9 +1,11 @@
 from flask import Blueprint, send_file, make_response, request, jsonify, Response
+from werkzeug.utils import secure_filename
 from services.nifti_processor import NiftiProcessor
 from services.session_manager import SessionManager, generate_uuid
 from services.auto_segmentor import run_auto_segmentation, cancel_all_inference
 from services.mesh_generation import generate_mesh_manifest, generate_organ_glb_bytes
 from services.inference_job_queue import InferenceJobQueue
+from services.intent_parser import parse_intent
 from models.application_session import ApplicationSession
 from models.combined_labels import CombinedLabels
 from models.base import db
@@ -34,6 +36,17 @@ import requests  # ⭐ 只在這裡 import 一次 requests
 # 建立 blueprint
 api_blueprint = Blueprint("api", __name__)
 last_session_check = datetime.now()
+
+import hmac
+import threading
+
+# Session/case ids come straight from client requests and are joined into
+# filesystem paths below. _is_safe_id (pure, unit-tested in tests/unit/
+# test_path_safety.py) rejects anything that could escape the intended
+# directory before it touches os.path; secure_filename is the barrier at each
+# path-construction site.
+from .path_safety import is_safe_id as _is_safe_id
+
 
 def _load_metadata_cache():
     try:
@@ -81,7 +94,7 @@ def _require_worker_auth():
         return jsonify({"error": "WORKER_API_TOKEN is not configured on server"}), 500
 
     provided = (request.headers.get("X-Worker-Token", "") or "").strip()
-    if provided != expected:
+    if not hmac.compare_digest(provided, expected):
         return jsonify({"error": "Unauthorized worker token"}), 401
     return None
 
@@ -179,7 +192,9 @@ def get_preview(clabel_ids):
 # if not preloaded
 @api_blueprint.route('/get_image_preview/<clabel_id>', methods=['GET'])
 def get_image_preview(clabel_id):
-    path = os.path.join(Constants.PANTS_PATH, "profile_only", get_panTS_id(clabel_id), "profile.jpg")
+    if not _is_safe_id(clabel_id):
+        return jsonify({"error": "Invalid id"}), 400
+    path = os.path.join(Constants.PANTS_PATH, "profile_only", get_panTS_id(secure_filename(clabel_id)), "profile.jpg")
     if not os.path.exists(path):
         return jsonify({"error": f"File not found: {path} "}), 404
     return send_file(
@@ -192,7 +207,9 @@ def get_image_preview(clabel_id):
 
 @api_blueprint.route("/cases/<case_id>/mesh-manifest")
 def get_mesh_manifest(case_id):
-    manifest_path = os.path.join(Constants.MESH_PATH, get_panTS_id(case_id), "manifest.json") 
+    if not _is_safe_id(case_id):
+        return jsonify({"error": "Invalid id"}), 400
+    manifest_path = os.path.join(Constants.MESH_PATH, get_panTS_id(secure_filename(case_id)), "manifest.json")
 
     if not os.path.exists(manifest_path):
         return jsonify({"error": f"File not found: {manifest_path} "}), 404
@@ -270,7 +287,9 @@ def upload():
         session_id = request.form.get('SESSION_ID')
         if not session_id:
             return jsonify({"error": "No session ID provided"}), 400
-        
+        if not _is_safe_id(session_id):
+            return jsonify({"error": "Invalid session ID"}), 400
+
         base_path = os.path.join(Constants.SESSIONS_DIR_NAME, session_id)
         os.makedirs(base_path, exist_ok=True)
 
@@ -311,7 +330,9 @@ def get_mask_data():
   
 @api_blueprint.route('/get-main-nifti/<clabel_id>', methods=['GET'])
 def get_main_nifti(clabel_id):
-    case_dir = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(clabel_id)}"
+    if not _is_safe_id(clabel_id):
+        return jsonify({"error": "Invalid id"}), 400
+    case_dir = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(secure_filename(clabel_id))}"
     main_nifti_path = f"{case_dir}/{Constants.MAIN_NIFTI_FILENAME}"
 
     # ?res=low → serve the precomputed low-res copy when present (much smaller/faster
@@ -326,7 +347,6 @@ def get_main_nifti(clabel_id):
 
         response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
         # response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
-        response.headers['Content-Encoding'] = 'gzip'
         # Volumes are immutable per case — let the browser cache so revisits are instant.
         response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
 
@@ -352,8 +372,8 @@ def get_report(id):
 
 
         base_path = f"{SESSIONS_DIR}/{id}"
-        ct_path = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(id)}/{Constants.MAIN_NIFTI_FILENAME}"
-        masks = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(id)}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+        ct_path = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(secure_filename(str(id)))}/{Constants.MAIN_NIFTI_FILENAME}"
+        masks = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(secure_filename(str(id)))}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
         
         template_pdf = os.getenv("TEMPLATE_PATH", "report_template_3.pdf")
 
@@ -423,9 +443,10 @@ async def get_specific_segmentations(combined_labels_id):
         return jsonify({"error": f"Error loading organ metrics: {str(e)}"}), 500
 @api_blueprint.route('/get-segmentations/<combined_labels_id>', methods=['GET'])
 async def get_segmentations(combined_labels_id):
-    nifti_path = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(combined_labels_id)}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+    if not _is_safe_id(combined_labels_id):
+        return jsonify({"error": "Invalid id"}), 400
+    nifti_path = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(secure_filename(combined_labels_id))}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
     labels = list(Constants.PREDEFINED_LABELS.values())
-    print("xdjs")
     # ?res=low → serve the precomputed low-res mask (paired with the low-res CT so the
     # overlay stays aligned). Falls back to full res below if it hasn't been generated.
     if (request.args.get('res') or '').strip().lower() == 'low':
@@ -433,30 +454,30 @@ async def get_segmentations(combined_labels_id):
         if os.path.exists(low_path):
             response = make_response(send_file(low_path, mimetype='application/gzip'))
             response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-            response.headers['Content-Encoding'] = 'gzip'
             response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
             return response
 
     img = nib.load(nifti_path)
-    print("⚠️ Detected float label map, converting to uint8 for Cornerstone compatibility...")
 
     try:
+        serve_path = nifti_path
         if img.get_data_dtype() != np.uint8:
-            raw = np.asanyarray(img.dataobj)
+            # The source is a float label map; Cornerstone needs uint8. Write the
+            # converted copy to a sibling file and serve THAT — never overwrite the
+            # original ground-truth mask on disk (an HTTP GET must not mutate data).
+            converted_path = nifti_path.replace('.nii.gz', '_uint8.nii.gz')
+            if not os.path.exists(converted_path):
+                print("⚠️ Detected float label map, converting to uint8 for Cornerstone compatibility...")
+                raw = np.asanyarray(img.dataobj)
+                data = np.rint(raw).astype(np.uint8)
 
-            rounded = np.rint(raw)
-            data = rounded.astype(np.uint8)
-            data = data.astype(np.uint8)
+                new_img = nib.Nifti1Image(data, img.affine, header=img.header)
+                new_img.set_data_dtype(np.uint8)
+                nib.save(new_img, converted_path)
+            serve_path = converted_path
 
-            new_img = nib.Nifti1Image(data, img.affine, header=img.header)
-            new_img.set_data_dtype(np.uint8)
-
-            converted_path = nifti_path
-            nib.save(new_img, converted_path)
-
-        response = make_response(send_file(nifti_path, mimetype='application/gzip'))
+        response = make_response(send_file(serve_path, mimetype='application/gzip'))
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-        response.headers['Content-Encoding'] = 'gzip'
         response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
         # response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
         # response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
@@ -471,7 +492,9 @@ async def get_segmentations(combined_labels_id):
 @api_blueprint.route('/download/<id>', methods=['GET'])
 def download_segmentation_zip(id):
     try:
-        outputs_ct_folder = Path(f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(id)}/segmentations")
+        if not _is_safe_id(id):
+            return jsonify({"error": "Invalid id"}), 400
+        outputs_ct_folder = Path(f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(secure_filename(str(id)))}/segmentations")
         
         if not os.path.exists(outputs_ct_folder):
             return jsonify({"error": "Outputs/ct folder not found"}), 404
@@ -498,19 +521,25 @@ def download_segmentation_zip(id):
         print(f"❌ [Download Error] {e}")
         return jsonify({"error": "Internal server error"}), 500
 
-import threading
 import time
 
 inference_jobs = {}  # {session_id: {status, model, error, session_path, zip_path}}
+# Guards the read-modify-write in _set_inference_job: background segmentation
+# threads and request handlers touch inference_jobs concurrently, and the
+# get/update/set below is not atomic without a lock (updates would be lost).
+_inference_jobs_lock = threading.Lock()
 
 
 def _set_inference_job(session_id, **kwargs):
-    current = inference_jobs.get(session_id, {})
-    current.update(kwargs)
-    inference_jobs[session_id] = current
+    with _inference_jobs_lock:
+        current = inference_jobs.get(session_id, {})
+        current.update(kwargs)
+        inference_jobs[session_id] = current
 
 
 def _start_auto_segmentation(session_id, model_name, ct_file=None, server_input_path=None):
+    if not _is_safe_id(session_id):
+        return jsonify({"error": "Invalid session ID"}), 400
     session_path = os.path.join(SESSIONS_DIR, session_id)
     os.makedirs(session_path, exist_ok=True)
 
@@ -909,10 +938,17 @@ def download_pull_job_result(job_id):
 
 @api_blueprint.route('/get_result/<session_id>', methods=['GET'])
 def get_result(session_id):
+    if not _is_safe_id(session_id):
+        return jsonify({"error": "Invalid session ID"}), 400
     session_path = os.path.join(SESSIONS_DIR, session_id)
     zip_path = os.path.join(session_path, "auto_masks.zip")
 
-    wait_for_file(zip_path, timeout=30)
+    # Poll briefly for the archive. If it isn't ready, return 202 so the client
+    # can keep polling instead of receiving an uncaught TimeoutError → 500.
+    try:
+        wait_for_file(zip_path, timeout=30)
+    except TimeoutError:
+        return jsonify({"error": "Result not ready", "session_id": session_id}), 202
 
     response = send_file(
         zip_path,
@@ -996,6 +1032,13 @@ def upload_inference_chunk():
         if not all([session_id, chunk_index, total_chunks, chunk_file]):
             return jsonify({"error": "Missing parameters"}), 400
 
+        # session_id and chunk_index are both joined into a filesystem path below;
+        # reject anything non-numeric / traversal-y before it touches os.path.
+        if not _is_safe_id(session_id):
+            return jsonify({"error": "Invalid session ID"}), 400
+        if not str(chunk_index).isdigit():
+            return jsonify({"error": "Invalid chunk index"}), 400
+
         session_folder = os.path.join(CHUNK_DIR, session_id)
         os.makedirs(session_folder, exist_ok=True)
 
@@ -1019,6 +1062,8 @@ def finalize_upload():
     """
     try:
         session_id = request.form.get("session_id")
+        if not _is_safe_id(session_id):
+            return jsonify({"error": "Invalid session ID"}), 400
         total_chunks = int(request.form.get("total_chunks"))
         output_filename = request.form.get("output_filename", "inference_input.gz")
         requested_bdmap_id = request.form.get("bdmap_id") or request.form.get("case_id")
@@ -1176,8 +1221,6 @@ def ping():
 def api_search():
     # return jsonify({"message": "pong"}), 200
     df = apply_filters(DF).copy()
-    sort_by  = (_arg("sort_by", "top") or "top").strip().lower()
-    sort_by  = (_arg("sort_by", "top") or "top").strip().lower()
     df = ensure_sort_cols(df)
 
     # ---- 排序參數 ----
@@ -1463,3 +1506,271 @@ def api_random_topk_rotate_norand():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+@api_blueprint.route("/ai-command", methods=["POST"])
+def ai_command():
+    try:
+        body = request.get_json(force=True, silent=True) or {}
+        message = (body.get("message") or "").strip()
+        if not message:
+            return jsonify({
+                "reply": "Please type a question or viewer command.",
+                "actions": [],
+                "source": "hardcoded",
+            }), 400
+        available_organs = body.get("available_organs") or []
+        if not isinstance(available_organs, list):
+            available_organs = []
+        viewer_state = body.get("viewer_state") or {}
+        case_id = str(body.get("case_id") or body.get("session_id") or "")
+        result = parse_intent(
+            message=message,
+            available_organs=available_organs,
+            viewer_state=viewer_state,
+            case_id=case_id or None,
+        )
+        return jsonify(result)
+    except Exception as error:
+        print("[ai_command error]", type(error).__name__)
+        return jsonify({
+            "reply": "An internal error occurred while processing the AI command.",
+            "actions": [],
+            "source": "error",
+        }), 500
+
+
+
+# ---------------------------------------------------------------------------
+# Edited segmentation masks (viewer's Edit Masks panel).
+# Strictly additive and isolated: writes ONLY into {PANTS_PATH}/edited_masks/,
+# never touching image_only/ or mask_only/, so the original dataset is safe.
+# Each save is timestamped rather than overwritten — a lightweight version
+# history a maintainer can inspect or promote manually.
+# ---------------------------------------------------------------------------
+
+_EDITED_MASKS_DIRNAME = "edited_masks"
+_EDITED_MASK_MAX_BYTES = 512 * 1024 * 1024  # generous cap for a full-body labelmap
+
+
+def _edited_masks_dir(case_id):
+    # Traversal safety: require digits, then convert to int before it reaches the
+    # filesystem. A number can't carry a "../" or "/" payload, so the only value
+    # that flows into os.path.join is fully controlled (get_panTS_id just zero-pads
+    # and prefixes "PanTS_"). The int() cast is also what lets static analysis
+    # (CodeQL py/path-injection) see the user-tainted string is neutralized.
+    if not str(case_id).isdigit():
+        raise ValueError("case_id must be numeric")
+    return os.path.join(Constants.PANTS_PATH, _EDITED_MASKS_DIRNAME, get_panTS_id(int(case_id)))
+
+
+@api_blueprint.route('/save-edited-mask/<case_id>', methods=['POST'])
+def save_edited_mask(case_id):
+    try:
+        uploaded = request.files.get("mask")
+        if uploaded is None:
+            return jsonify({"error": "No file field 'mask' in the request."}), 400
+        data = uploaded.read(_EDITED_MASK_MAX_BYTES + 1)
+        if len(data) > _EDITED_MASK_MAX_BYTES:
+            return jsonify({"error": "Mask file too large."}), 413
+        # The viewer always sends gzipped NIfTI; check the gzip magic bytes.
+        if len(data) < 2 or data[0] != 0x1F or data[1] != 0x8B:
+            return jsonify({"error": "Expected a gzipped NIfTI (.nii.gz) file."}), 400
+
+        out_dir = _edited_masks_dir(case_id)
+        os.makedirs(out_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"combined_labels_edited_{timestamp}.nii.gz"
+        with open(os.path.join(out_dir, filename), "wb") as f:
+            f.write(data)
+        return jsonify({"saved": True, "filename": filename, "bytes": len(data)})
+    except Exception as error:
+        print("[save_edited_mask error]", type(error).__name__, error)
+        return jsonify({"error": "Failed to save the edited mask."}), 500
+
+
+@api_blueprint.route('/list-edited-masks/<case_id>', methods=['GET'])
+def list_edited_masks(case_id):
+    try:
+        out_dir = _edited_masks_dir(case_id)
+        if not os.path.isdir(out_dir):
+            return jsonify({"items": []})
+        items = []
+        for name in sorted(os.listdir(out_dir), reverse=True):
+            path = os.path.join(out_dir, name)
+            if not os.path.isfile(path):
+                continue
+            items.append({
+                "filename": name,
+                "bytes": os.path.getsize(path),
+                "modified": datetime.fromtimestamp(os.path.getmtime(path)).isoformat(),
+            })
+        return jsonify({"items": items})
+    except Exception as error:
+        print("[list_edited_masks error]", type(error).__name__, error)
+        return jsonify({"error": "Failed to list edited masks."}), 500
+
+
+# ---------------------------------------------------------------------------
+# Advanced analysis (viewer's AI-segment tool + vessel CPR panel).
+# Additive and read-only against the dataset — loads image_only/ and mask_only/
+# but writes nothing there. Heavy numeric work lives in services/advanced_analysis.
+# ---------------------------------------------------------------------------
+
+import threading
+
+# Each of these requests loads a CT volume into worker RAM, so unbounded
+# concurrency is an OOM waiting to happen. Cap in-flight analyses per process
+# (gunicorn workers each get their own slots); extras get an immediate 503
+# instead of queueing until the worker starves.
+_ANALYSIS_SLOTS = threading.BoundedSemaphore(2)
+_ANALYSIS_BUSY_RESPONSE = (
+    {"error": "The analysis service is busy — try again in a moment."},
+    503,
+)
+
+def _safe_case_id(case_id):
+    # Traversal safety: require digits, then hand get_panTS_id an int so the
+    # user value can't carry a "../" or "/" payload into the CT/mask path. The
+    # int() cast is also the barrier CodeQL recognizes as sanitizing the taint.
+    if not str(case_id).isdigit():
+        raise ValueError("case_id must be numeric")
+    return int(case_id)
+
+
+def _case_ct_path(case_id, low=False):
+    case_dir = f"{Constants.PANTS_PATH}/image_only/{get_panTS_id(_safe_case_id(case_id))}"
+    path = f"{case_dir}/{Constants.MAIN_NIFTI_FILENAME}"
+    if low:
+        low_path = path.replace('.nii.gz', '_lowres.nii.gz')
+        if os.path.exists(low_path):
+            return low_path
+    return path
+
+
+def _case_mask_path(case_id, low=False):
+    case_dir = f"{Constants.PANTS_PATH}/mask_only/{get_panTS_id(_safe_case_id(case_id))}"
+    path = f"{case_dir}/{Constants.COMBINED_LABELS_NIFTI_FILENAME}"
+    if low:
+        low_path = path.replace('.nii.gz', '_lowres.nii.gz')
+        if os.path.exists(low_path):
+            return low_path
+    return path
+
+
+@api_blueprint.route('/interactive-segment/<case_id>', methods=['POST'])
+def interactive_segment(case_id):
+    """Click-to-segment: seed prompt -> proposed mask (.nii.gz in CT geometry).
+
+    Body JSON: { point_lps:[x,y,z] | point_ijk:[i,j,k], tolerance?, box_lps?,
+                 res?: "low"|"full" }. res should match the resolution the viewer
+                 loaded so the returned mask's voxel grid aligns with the labelmap.
+    """
+    if not _ANALYSIS_SLOTS.acquire(blocking=False):
+        return jsonify(_ANALYSIS_BUSY_RESPONSE[0]), _ANALYSIS_BUSY_RESPONSE[1]
+    try:
+        import numpy as np
+        from services.advanced_analysis import segment_from_prompt
+        body = request.get_json(force=True, silent=True) or {}
+        low = (body.get("res") or "low").lower() == "low"
+        ct_path = _case_ct_path(case_id, low=low)
+        if not os.path.exists(ct_path):
+            return jsonify({"error": "CT not found for this case on the server."}), 404
+
+        ct_obj = nib.load(ct_path)
+        # float32: half the RAM of nibabel's float64 default — these are public
+        # endpoints and a full-res CT at float64 is multiple GB per request.
+        ct = ct_obj.get_fdata(dtype=np.float32)
+        mask = segment_from_prompt(ct, ct_obj.affine, body)
+        if int(mask.sum()) == 0:
+            return jsonify({"error": "Nothing grew from that point — try a different spot or a higher tolerance."}), 422
+
+        out = nib.Nifti1Image(mask, ct_obj.affine, ct_obj.header)
+        out.header.set_data_dtype('uint8')
+        # nibabel serializes an uncompressed .nii to bytes; gzip it ourselves.
+        import gzip as _gzip
+        gz = _gzip.compress(out.to_bytes())
+        resp = make_response(gz)
+        resp.headers['Content-Type'] = 'application/gzip'
+        resp.headers['X-Mask-Voxels'] = str(int(mask.sum()))
+        resp.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+        return resp
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as error:
+        print("[interactive_segment error]", type(error).__name__, error)
+        return jsonify({"error": "Interactive segmentation failed."}), 500
+    finally:
+        _ANALYSIS_SLOTS.release()
+
+
+@api_blueprint.route('/vessel-cpr/<case_id>', methods=['POST'])
+def vessel_cpr(case_id):
+    """Straightened vessel reformat + tumour-contact metrics for staging.
+
+    Body JSON: { vessel_label:int, lesion_label?:int (default 22 pancreatic
+                 lesion), res?, slab_radius_mm?, window? }. Returns metrics +
+                 the reformat as a base64 PNG (already windowed for display).
+    """
+    if not _ANALYSIS_SLOTS.acquire(blocking=False):
+        return jsonify(_ANALYSIS_BUSY_RESPONSE[0]), _ANALYSIS_BUSY_RESPONSE[1]
+    try:
+        import numpy as np
+        from services.advanced_analysis import analyze_vessel
+        body = request.get_json(force=True, silent=True) or {}
+        vessel_label = int(body.get("vessel_label", 0))
+        if vessel_label <= 0:
+            return jsonify({"error": "vessel_label is required."}), 400
+        lesion_label = int(body.get("lesion_label", 22))
+        low = (body.get("res") or "low").lower() == "low"
+
+        ct_path = _case_ct_path(case_id, low=low)
+        mask_path = _case_mask_path(case_id, low=low)
+        if not (os.path.exists(ct_path) and os.path.exists(mask_path)):
+            return jsonify({"error": "CT or segmentation not found for this case."}), 404
+
+        ct_obj = nib.load(ct_path)
+        # float32 (see interactive_segment): halves the per-request RAM footprint.
+        ct = ct_obj.get_fdata(dtype=np.float32)
+        labels = nib.load(mask_path).get_fdata(dtype=np.float32)
+        vessel_mask = (np.round(labels) == vessel_label).astype(np.uint8)
+        if vessel_mask.sum() == 0:
+            return jsonify({"error": "That vessel isn't segmented in this case."}), 422
+        lesion_mask = (np.round(labels) == lesion_label).astype(np.uint8)
+        has_lesion = lesion_mask.sum() > 0
+
+        res = analyze_vessel(
+            ct, ct_obj.affine, vessel_mask,
+            lesion_mask if has_lesion else None,
+            slab_radius_mm=float(body.get("slab_radius_mm", 20.0)),
+        )
+
+        # Window the reformat (default soft-tissue) and PNG-encode it.
+        w = body.get("window") or {}
+        width = float(w.get("width", 400)); center = float(w.get("center", 40))
+        lo, hi = center - width / 2, center + width / 2
+        img = np.clip((res["reformat"] - lo) / max(hi - lo, 1e-6), 0, 1)
+        img8 = (img * 255).astype(np.uint8)
+
+        from PIL import Image
+        png = io.BytesIO()
+        Image.fromarray(img8, mode="L").save(png, format="PNG")
+        import base64
+        data_url = "data:image/png;base64," + base64.b64encode(png.getvalue()).decode()
+
+        return jsonify({
+            "length_mm": round(res["length_mm"], 1),
+            "max_contact_deg": round(res["max_contact_deg"], 1),
+            "contact_length_mm": round(res["contact_length_mm"], 1),
+            "has_lesion": bool(has_lesion),
+            "num_points": res["num_points"],
+            "contact_profile": [round(v, 1) for v in res["contact_profile"]],
+            "reformat_png": data_url,
+            "reformat_size": list(res["reformat"].shape),
+        })
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as error:
+        print("[vessel_cpr error]", type(error).__name__, error)
+        return jsonify({"error": "Vessel analysis failed."}), 500
+    finally:
+        _ANALYSIS_SLOTS.release()

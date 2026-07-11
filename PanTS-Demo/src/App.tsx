@@ -4,6 +4,7 @@ import "./App.css";
 import { AnnotationProvider } from "./contexts/annotationContexts";
 import { FileProvider } from "./contexts/fileContexts";
 import LandingPage from "./pages/LandingPage";
+import ComparePage from "./routes/ComparePage";
 import Homepage from "./routes/Homepage";
 import TeamPage from "./routes/TeamPage";
 
@@ -11,6 +12,7 @@ import TeamPage from "./routes/TeamPage";
 // is the bulk of the JS bundle. Code-split them so the landing + dataset pages don't
 // download the viewer up front — they only load it when a case is actually opened.
 const VisualizationPage = lazy(() => import("./routes/VisualizationPage"));
+const CompareViewerPage = lazy(() => import("./routes/CompareViewerPage"));
 const UploadPage = lazy(() => import("./routes/UploadPage"));
 const RotatingHeartLoader = lazy(() => import("./components/Loading"));
 
@@ -59,11 +61,15 @@ function App() {
 								{/* <Route path="/:type/:page" element={<Homepage />} /> */}
 								<Route path="/case/:caseId" element={<VisualizationPage />} />
 								<Route path="/session/:sessionId" element={<VisualizationPage />} />
+								{/* Local DICOM series picked on the Upload page (files held in memory). */}
+								<Route path="/dicom" element={<VisualizationPage />} />
 								<Route path="/reconstruction/:reconstructionId" element={<VisualizationPage />} />
 								<Route path="/test" element={<RotatingHeartLoader />} />
 								<Route path="/upload" element={<UploadPage />} />
 								<Route path="/api" element={<Navigate to="/upload" replace />} />
 									<Route path="/team" element={<TeamPage />} />
+									<Route path="/compare" element={<ComparePage />} />
+									<Route path="/compare-viewer" element={<CompareViewerPage />} />
 							</Routes>
 						</Suspense>
 					</BrowserRouter>
