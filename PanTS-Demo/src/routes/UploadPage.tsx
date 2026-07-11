@@ -5,6 +5,7 @@ import { API_BASE } from '../helpers/constants';
 import Header from '../components/Header';
 
 const CtPreview = lazy(() => import('../components/CtPreview/CtPreview'));
+const DicomPreview = lazy(() => import('../components/CtPreview/DicomPreview'));
 
 const CHUNK_SIZE = 256 * 1024;
 const NIFTI_EXTS = ['.nii', '.nii.gz'];
@@ -51,6 +52,27 @@ const parseApiResponse = async (res: Response): Promise<any> => {
   if (ct.includes('application/json')) return res.json();
   const text = await res.text();
   throw new Error(`HTTP ${res.status}: ${text.slice(0, 200).replace(/\s+/g, ' ').trim()}`);
+};
+
+// Completed/failed results survive a tab reload: the queue is mirrored to localStorage
+// (minus the File objects, which can't be serialized). Jobs that were still in flight on
+// reload — uploading, queued, or running inference — are NOT re-attached or resumed;
+// they're marked failed so reopening the page never auto-resumes any work.
+const STORAGE_KEY = 'pants_upload_jobs_v1';
+
+const loadPersistedJobs = (): UploadJob[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const saved = JSON.parse(raw) as Omit<UploadJob, 'files'>[];
+    return saved.map(j =>
+      j.status === 'uploading' || j.status === 'queued' || j.status === 'processing'
+        ? { ...j, files: [], status: 'failed' as JobStatus, error: 'Interrupted by page reload — please re-upload' }
+        : { ...j, files: [] }
+    );
+  } catch {
+    return [];
+  }
 };
 
 type PipelineOption = { value: string; label: string };
@@ -121,7 +143,7 @@ const UploadPage: React.FC = () => {
   const [selectedPreprocessing, setSelectedPreprocessing] = useState('');
   const [selectedPostprocessing, setSelectedPostprocessing] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
-  const [jobs, setJobs] = useState<UploadJob[]>([]);
+  const [jobs, setJobs] = useState<UploadJob[]>(loadPersistedJobs);
 
   /* ── File selection ── */
   const addFiles = (files: File[]) => {
@@ -245,6 +267,25 @@ const UploadPage: React.FC = () => {
         } catch { /* keep polling */ }
       }, 2500);
     });
+
+  /* ── Persistence: mirror the queue to localStorage on every change ── */
+  useEffect(() => {
+    try {
+      const persistable = jobs.map(j => ({
+        id: j.id,
+        displayName: j.displayName,
+        isDicom: j.isDicom,
+        sessionId: j.sessionId,
+        status: j.status,
+        uploadProgress: j.uploadProgress,
+        inferenceProgress: j.inferenceProgress,
+        model: j.model,
+        timestamp: j.timestamp,
+        error: j.error,
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
+    } catch { /* storage unavailable — non-fatal */ }
+  }, [jobs]);
 
   /* ── Process NIfTI job ── */
   const processNiftiJob = async (job: UploadJob): Promise<void> => {
@@ -492,15 +533,13 @@ const UploadPage: React.FC = () => {
               {pendingItems.map(item => (
                 <div key={item.id} className={`file-chip${previewItemId === item.id ? ' file-chip--active' : ''}`}>
                   <span className="file-chip-name">{item.displayName}</span>
-                  {!item.isDicom && (
-                    <button
-                      className="file-chip-preview"
-                      onClick={e => { e.stopPropagation(); togglePreview(item.id); }}
-                      title="Preview CT scan"
-                    >
-                      {previewItemId === item.id ? 'Hide' : 'Preview'}
-                    </button>
-                  )}
+                  <button
+                    className="file-chip-preview"
+                    onClick={e => { e.stopPropagation(); togglePreview(item.id); }}
+                    title={item.isDicom ? 'Preview DICOM series' : 'Preview CT scan'}
+                  >
+                    {previewItemId === item.id ? 'Hide' : 'Preview'}
+                  </button>
                   <button
                     className="file-chip-remove"
                     onClick={e => { e.stopPropagation(); removePendingItem(item.id); }}
@@ -517,7 +556,9 @@ const UploadPage: React.FC = () => {
             <div className="pending-preview-panel">
               <div className="ct-preview-label">Preview · {previewItem.displayName}</div>
               <Suspense fallback={<div className="ct-preview ct-preview--msg">Loading preview…</div>}>
-                <CtPreview file={previewItem.files[0]} />
+                {previewItem.isDicom
+                  ? <DicomPreview files={previewItem.files} />
+                  : <CtPreview file={previewItem.files[0]} />}
               </Suspense>
             </div>
           )}
