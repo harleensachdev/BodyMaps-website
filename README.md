@@ -66,11 +66,14 @@ git fetch
 git checkout main
 git pull
 ```
+If `git pull` (or the checkout) refuses because of "local changes would be overwritten," someone edited files directly on the server. Do **not** force past it. Run `git status` to see what changed, then discard each file with `git checkout -- <file>` (or ask the maintainer) before pulling again. The server should never carry local edits.
 
-#### 2. Rebuild the frontend
+#### 2. Rebuild the frontend and refresh backend dependencies
 ```
 cd /home/visitor/PanTS-Viewer/PanTS-Demo && npm ci && npm run build
+/home/visitor/.conda/envs/PanTS_backend/bin/pip install -r /home/visitor/PanTS-Viewer/flask-server/requirements.txt
 ```
+The `pip install` is a fast no-op when nothing changed, but it is required whenever a PR adds or bumps a Python dependency — otherwise the restarted backend crashes on a missing import and the site goes empty. If `npm run build` errors out, **stop here**: nginx keeps serving the old site until a build succeeds, so fix the error before restarting the backend.
 
 #### 3. Restart the backend
 ```
