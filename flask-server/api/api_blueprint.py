@@ -3275,25 +3275,7 @@ def list_edited_masks(case_id):
         print("[list_edited_masks error]", type(error).__name__, error)
         return jsonify({"error": "Failed to list edited masks."}), 500
 
-@api_blueprint.route('/get-edited-labels/<case_id>', methods=['GET'])
-def get_edited_labels(case_id):
-    """Latest saved custom-class name/color sidecar for a case, if any."""
-    try:
-        out_dir = _edited_masks_dir(case_id)
-        if not os.path.isdir(out_dir):
-            return jsonify({})
-        candidates = sorted(
-            (n for n in os.listdir(out_dir) if n.endswith("_labels.json")),
-            reverse=True,
-        )
-        if not candidates:
-            return jsonify({})
-        with open(os.path.join(out_dir, candidates[0]), "r") as f:
-            data = json.load(f)
-        return jsonify(data if isinstance(data, dict) else {})
-    except Exception as error:
-        print("[get_edited_labels error]", type(error).__name__, error)
-        return jsonify({})
+
 # ---------------------------------------------------------------------------
 # Advanced analysis (viewer's AI-segment tool + vessel CPR panel).
 # Additive and read-only against the dataset — loads image_only/ and mask_only/

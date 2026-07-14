@@ -115,13 +115,15 @@ function MaskEditPanel({ organs, caseId, serverCaseId, mode, onModeChange, onClo
 		try {
 			const form = new FormData();
 			form.append("mask", buildNiftiGzBlob(labelmap), "combined_labels_edited.nii.gz");
-
+			
 			const customLabels = getCustomSegmentLabelsForExport();
-			form.append(
-				"labels",
-				new Blob([JSON.stringify(customLabels)], {type: "application/json"}),
-				"labels.json"
-			);
+			if (Object.keys(customLabels).length > 0) {
+				form.append(
+					"labels",
+					new Blob([JSON.stringify(customLabels)], { type: "application/json" }),
+					"labels.json"
+				);
+			}
 
 			const res = await fetch(`${API_BASE}/api/save-edited-mask/${serverCaseId}`, {
 				method: "POST",
