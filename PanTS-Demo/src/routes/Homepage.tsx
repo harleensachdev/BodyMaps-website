@@ -37,6 +37,7 @@ type FacetData = {
 	counts: Record<string, FacetRow[]>;
 	unknown: Record<string, number>;
 	total: number;
+	datasetCounts: Record<string, number>;
 };
 
 // Filter groups whose available values are discovered from /api/facets (not hardcoded).
@@ -287,6 +288,7 @@ export default function Homepage() {
 				counts: data.facets ?? {},
 				unknown: data.unknown_counts ?? {},
 				total: data.total ?? 0,
+				datasetCounts: data.dataset_counts ?? {},
 			});
 		} catch (e) {
 			console.error(e);
@@ -725,6 +727,7 @@ export default function Homepage() {
 											onClick={() => toggleMulti("dataset", opt.value)}
 										>
 											{opt.label}
+											{countBadge(facetData?.datasetCounts[opt.value] ?? null)}
 										</button>
 									))}
 								</div>
