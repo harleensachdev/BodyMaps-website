@@ -59,6 +59,13 @@ const TUMOR_OPTIONS: { value: TumorFilter; label: string }[] = [
 	{ value: "no_tumor", label: "No tumor" },
 ];
 
+// Which dataset(s) to search. Empty = both (backend ?dataset=all). CancerVerse is
+// CT-only (no masks yet), so those cases sort after the mask-complete PanTS cases.
+const DATASET_OPTIONS = [
+	{ value: "PanTS", label: "PanTS" },
+	{ value: "CancerVerse", label: "CancerVerse" },
+];
+
 // Values match the backend /api/search params: sex -> M/F/UNKNOWN, age -> age_bin[].
 const SEX_OPTIONS = [
 	{ value: "M", label: "Male" },
@@ -698,6 +705,31 @@ export default function Homepage() {
 								gap: "20px",
 							}}
 						>
+							{/* Dataset */}
+							<div className="flex flex-col gap-2.5">
+								<span className="flex items-center gap-2">
+									<span style={filterLabelStyle}>Dataset</span>
+									<span style={multiSelectTagStyle}>Multi-Select</span>
+								</span>
+								<div className="flex flex-wrap gap-2">
+									<button
+										style={pillStyle(filters.dataset.length === 0)}
+										onClick={() => setFilters((f) => ({ ...f, dataset: [] }))}
+									>
+										Any
+									</button>
+									{DATASET_OPTIONS.map((opt) => (
+										<button
+											key={opt.value}
+											style={pillStyle(filters.dataset.includes(opt.value))}
+											onClick={() => toggleMulti("dataset", opt.value)}
+										>
+											{opt.label}
+										</button>
+									))}
+								</div>
+							</div>
+
 							{/* Tumor */}
 							<div className="flex flex-col gap-2.5">
 								<span style={filterLabelStyle}>Tumor</span>

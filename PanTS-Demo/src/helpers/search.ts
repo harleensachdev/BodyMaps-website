@@ -5,6 +5,7 @@ export type TumorFilter = "any" | "tumor" | "no_tumor";
 
 export type SearchFilters = {
 	tumor: TumorFilter;
+	dataset: string[]; // "PanTS" / "CancerVerse"; empty = both (Any)
 	sex: string[]; // M / F / UNKNOWN
 	age: string[]; // "0-9" … "90-99" / "UNKNOWN"
 	manufacturer: string[]; // scanner manufacturer (from facets)
@@ -15,6 +16,7 @@ export type SearchFilters = {
 
 export const EMPTY_FILTERS: SearchFilters = {
 	tumor: "any",
+	dataset: [],
 	sex: [],
 	age: [],
 	manufacturer: [],
@@ -24,7 +26,7 @@ export const EMPTY_FILTERS: SearchFilters = {
 };
 
 // The multi-select array keys (everything except `tumor`).
-export type MultiFilterKey = "sex" | "age" | "manufacturer" | "ctPhase" | "siteNat" | "year";
+export type MultiFilterKey = "dataset" | "sex" | "age" | "manufacturer" | "ctPhase" | "siteNat" | "year";
 
 // Minimal shape of an item returned by /api/search and /api/random.
 export type SearchItem = {
@@ -53,6 +55,14 @@ export const buildSearchParams = (
 	opts: { sortBy?: string; perPage?: number } = {}
 ): URLSearchParams => {
 	const params = new URLSearchParams();
+	// Dataset dispatch → backend ?dataset=. Empty or both = all (show PanTS + CancerVerse);
+	// exactly one selected restricts to that dataset.
+	const ds = filters.dataset ?? [];
+	const hasPanTS = ds.includes("PanTS");
+	const hasCV = ds.includes("CancerVerse");
+	if (hasCV && !hasPanTS) params.set("dataset", "cancerverse");
+	else if (hasPanTS && !hasCV) params.set("dataset", "pants");
+	else params.set("dataset", "all"); // both or neither → everything
 	filters.sex.forEach((v) => params.append("sex[]", v));
 	if (filters.tumor === "tumor") params.set("tumor", "1");
 	else if (filters.tumor === "no_tumor") params.set("tumor", "0");
@@ -71,8 +81,14 @@ export const buildSearchParams = (
 export const parseFiltersFromParams = (params: URLSearchParams): SearchFilters => {
 	const tumorRaw = params.get("tumor");
 	const tumor: TumorFilter = tumorRaw === "1" ? "tumor" : tumorRaw === "0" ? "no_tumor" : "any";
+	const datasetRaw = (params.get("dataset") || "").toLowerCase();
+	const dataset =
+		datasetRaw === "pants" ? ["PanTS"] :
+		datasetRaw === "cancerverse" || datasetRaw === "cv" ? ["CancerVerse"] :
+		[]; // "all"/absent → both (Any)
 	return {
 		tumor,
+		dataset,
 		sex: params.getAll("sex[]"),
 		age: params.getAll("age_bin[]"),
 		manufacturer: params.getAll("manufacturer[]"),
@@ -84,6 +100,9 @@ export const parseFiltersFromParams = (params: URLSearchParams): SearchFilters =
 
 export const countActiveFilters = (f: SearchFilters): number =>
 	(f.tumor !== "any" ? 1 : 0) +
+	// dataset only counts as an active filter when it restricts to a single dataset
+	// (empty or both = "Any", i.e. no restriction).
+	((f.dataset?.length ?? 0) === 1 ? 1 : 0) +
 	f.sex.length +
 	f.age.length +
 	f.manufacturer.length +

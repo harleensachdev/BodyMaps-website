@@ -64,12 +64,22 @@ describe("buildSearchParams", () => {
 		expect(params.get("sort_by")).toBe("quality");
 		expect(params.get("per_page")).toBe("12");
 	});
+
+	it("maps the dataset selection to ?dataset= (empty/both = all)", () => {
+		expect(buildSearchParams(base).get("dataset")).toBe("all"); // none selected
+		expect(buildSearchParams({ ...base, dataset: ["PanTS"] }).get("dataset")).toBe("pants");
+		expect(buildSearchParams({ ...base, dataset: ["CancerVerse"] }).get("dataset")).toBe("cancerverse");
+		expect(
+			buildSearchParams({ ...base, dataset: ["PanTS", "CancerVerse"] }).get("dataset")
+		).toBe("all");
+	});
 });
 
 describe("parseFiltersFromParams", () => {
 	it("round-trips filters through the URL query string", () => {
 		const filters: SearchFilters = {
 			tumor: "tumor",
+			dataset: ["CancerVerse"],
 			sex: ["F"],
 			age: ["50-59"],
 			manufacturer: ["GE"],
