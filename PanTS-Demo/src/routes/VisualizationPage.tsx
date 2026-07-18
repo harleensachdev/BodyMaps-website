@@ -341,7 +341,10 @@ function VisualizationPage() {
 				return;
 			}
 			const id = pantsCase ?? "1";
-			const p = getPanTSId(id);
+			const isCvCase = String(id).toUpperCase().startsWith("CV");
+			// getPanTSId produces a garbage value for CV ids, but it's only used in the HF
+			// fallback URLs which are never reached for CV (CT is always on the JHU server).
+			const p = isCvCase ? "" : getPanTSId(id);
 			const localCt = `${API_BASE}/api/get-main-nifti/${id}.nii.gz`;
 			const localSeg = `${API_BASE}/api/get-segmentations/${id}.nii.gz`;
 			const hfCt = `https://huggingface.co/datasets/BodyMaps/iPanTSMini/resolve/main/image_only/${p}/ct.nii.gz?download=true`;
@@ -354,7 +357,14 @@ function VisualizationPage() {
 			// full res when ?hd=1. HuggingFace fallback is full res only.
 			const resParam = isHd ? "" : "?res=low";
 			setCtUrl(localOk ? `${localCt}${resParam}` : hfCt);
-			setSegUrl(localOk ? `${localSeg}${resParam}` : hfSeg);
+			// CancerVerse cases have no masks yet — /api/get-segmentations returns
+			// {"masks_available": false} (JSON, HTTP 200) which hangs the nifti loader.
+			// Skip the seg URL entirely so the viewer opens CT-only without hanging.
+			if (isCvCase) {
+				setSegUrl(null);
+			} else {
+				setSegUrl(localOk ? `${localSeg}${resParam}` : hfSeg);
+			}
 		};
 		resolveSources();
 		return () => { cancelled = true; };

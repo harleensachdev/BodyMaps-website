@@ -1871,12 +1871,17 @@ def api_facets():
             if len(yr):
                 year_min, year_max = int(yr.min()), int(yr.max())
 
+        dataset_counts = {
+            "PanTS": int(len(DF)),
+            "CancerVerse": int(len(DF_CV)) if DF_CV is not None else 0,
+        }
         return jsonify({
             "facets": facets,
             "unknown_counts": unknown_counts,
             "age_range": {"min": age_min, "max": age_max},
             "year_range": {"min": year_min, "max": year_max},
             "total": int(len(df_now)),
+            "dataset_counts": dataset_counts,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
