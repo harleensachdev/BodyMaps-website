@@ -304,6 +304,7 @@ function VisualizationPage() {
 	// References and state
 	const params = useParams();
 	const pantsCase = params.caseId;
+	const isCvCase = String(pantsCase ?? "").toUpperCase().startsWith("CV");
 	const sessionId = params.sessionId;
 	// Local DICOM mode (/dicom): a folder of .dcm files picked on the Upload page,
 	// viewed entirely in-browser. No backend case, so no segmentation layer.
@@ -1030,7 +1031,7 @@ function VisualizationPage() {
 
 			if (
 				!ctUrl ||
-				!segUrl ||
+				(!segUrl && !isCvCase) ||   // CV is CT-only; only require seg for non-CV cases
 				!axial_ref.current ||
 				!sagittal_ref.current ||
 				!coronal_ref.current ||
@@ -1047,7 +1048,7 @@ function VisualizationPage() {
 				coronal_ref.current,
 				cmap,
 				ctUrl,
-				segUrl,
+				segUrl ?? undefined,
 				setLoading
 			);
 
